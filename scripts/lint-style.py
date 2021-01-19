@@ -17,11 +17,13 @@ exceptions = []
 
 SCRIPTS_DIR = Path(__file__).parent
 ROOT_DIR = SCRIPTS_DIR.parent
+RESERVED_NOTATION = (ROOT_DIR / 'src/tactic/reserved_notation.lean').resolve()
+
 
 with SCRIPTS_DIR.joinpath("style-exceptions.txt").open() as f:
     for line in f:
         fn, _, _, _, _, errno, *_ = line.split()
-        fn = Path(fn)
+        fn = Path(fn).resolve()
         if errno == "ERR_COP":
             exceptions += [(ERR_COP, fn)]
         if errno == "ERR_IMP":
@@ -84,7 +86,7 @@ def small_alpha_vrachy_check(lines, fn):
     return errors
 
 def reserved_notation_check(lines, fn):
-    if fn.relative_to(ROOT_DIR) == Path('src/tactic/reserved_notation.lean'):
+    if fn == RESERVED_NOTATION:
         return []
     errors = []
     for line_nr, line in skip_string(skip_comments(enumerate(lines, 1))):
@@ -171,7 +173,7 @@ def regular_check(lines, fn):
 def format_errors(errors):
     global new_exceptions
     for (errno, line_nr, fn) in errors:
-        if (errno, Path(fn).relative_to(ROOT_DIR)) in exceptions:
+        if (errno, fn) in exceptions:
             continue
         new_exceptions = True
         # filename first, then line so that we can call "sort" on the output
@@ -209,7 +211,7 @@ def lint(fn):
         format_errors(errs)
 
 for fn in fns:
-    lint(Path(fn))
+    lint(Path(fn).resolve())
 
 # if "exceptions" is empty,
 # we're trying to generate style-exceptions.txt,

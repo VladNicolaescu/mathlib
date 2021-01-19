@@ -86,6 +86,7 @@ example : swap (3 : fin 7) 5 10 = 12 := by norm_num
 example : swap (2 : fin 7) 4 9 = 11 := by norm_num
 example : swap (3 : fin 7) 5 0 = 0 := by norm_num
 example : swap (3 : fin 7) 12 9 = 2 := by norm_num
+example : swap (0 : fin (1 + 2)) (1 : fin (nat.succ (1 + 1))) (2 : fin 3) = 2 := by norm_num
 
 -- norm_swap doesn't generate trace output on non-swap expressions
 example : (1 : ℤ) = (1 : ℕ) := by norm_num

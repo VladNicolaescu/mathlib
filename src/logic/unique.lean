@@ -80,6 +80,8 @@ lemma eq_default (a : α) : a = default α := uniq _ a
 
 lemma default_eq (a : α) : default α = a := (uniq _ a).symm
 
+run_cmd tactic.skip
+
 @[priority 100] -- see Note [lower instance priority]
 instance : subsingleton α := ⟨λ a b, by rw [eq_default a, eq_default b]⟩
 

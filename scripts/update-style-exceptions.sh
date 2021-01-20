@@ -15,4 +15,4 @@
 
 # use C locale so that sorting is the same on macOS and Linux
 # see https://unix.stackexchange.com/questions/362728/why-does-gnu-sort-sort-differently-on-my-osx-machine-and-linux-machine
-find src archive -name '*.lean' | xargs ./scripts/lint-style.py | LC_ALL=C sort > scripts/style-exceptions.txt
+find src archive -name '*.lean' | xargs ./scripts/lint-style.py | sed "s;^$PWD/;;" | LC_ALL=C sort > scripts/style-exceptions.txt

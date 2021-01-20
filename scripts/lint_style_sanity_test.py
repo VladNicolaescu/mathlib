@@ -48,6 +48,21 @@ class TestLinterIntegration(unittest.TestCase):
             )
         self.assertIn(b"ERR_COP :", output.stdout)
 
+    def test_updating_style_exceptions_uses_relative_paths(self):
+        self.assertNotIn(
+            str(ROOT_DIR),
+            SCRIPTS_DIR.joinpath("style-exceptions.txt").read_text(),
+        )
+        result = subprocess.run(
+            ["./scripts/update-style-exceptions.sh"],
+            check=True,
+            capture_output=True,
+            cwd=ROOT_DIR,
+        )
+        self.assertNotIn(
+            str(ROOT_DIR),
+            SCRIPTS_DIR.joinpath("style-exceptions.txt").read_text(),
+        )
 
 if __name__ == "__main__":
     unittest.main()

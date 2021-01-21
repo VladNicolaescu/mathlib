@@ -74,6 +74,8 @@ h ← mk_file_handle fn mode.write,
 put_str h contents,
 close h
 
+local attribute [-instance] pi.subsingleton
+
 /-- Runs when called with `lean --run` -/
 meta def main : io unit := do
 env ← tactic.get_env,

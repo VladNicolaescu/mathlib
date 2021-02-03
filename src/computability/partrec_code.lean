@@ -12,12 +12,12 @@ open encodable denumerable
 namespace nat.partrec
 open nat (mkpair)
 
-theorem rfind' {f} (hf : nat.partrec f) : nat.partrec (nat.unpaired (λ a m,
+theorem rfind' {O : ℕ → ℕ} {f} (hf : nat.partrec O f) : nat.partrec O (nat.unpaired (λ a m,
   (nat.rfind (λ n, (λ m, m = 0) <$> f (mkpair a (n + m)))).map (+ m))) :=
 partrec₂.unpaired'.2 $
 begin
-  refine partrec.map
-    ((@partrec₂.unpaired' (λ (a b : ℕ),
+  refine partrec.map O
+    ((@partrec₂.unpaired' O (λ (a b : ℕ),
       nat.rfind (λ n, (λ m, m = 0) <$> f (mkpair a (n + b))))).1 _)
     (primrec.nat_add.comp primrec.snd $
       primrec.snd.comp primrec.fst).to_comp.to₂,
@@ -387,23 +387,23 @@ section
 open computable
 
 /- TODO(Mario): less copy-paste from previous proof -/
-theorem rec_computable {α σ} [primcodable α] [primcodable σ]
-  {c : α → code} (hc : computable c)
-  {z : α → σ} (hz : computable z)
-  {s : α → σ} (hs : computable s)
-  {l : α → σ} (hl : computable l)
-  {r : α → σ} (hr : computable r)
-  {pr : α → code × code × σ × σ → σ} (hpr : computable₂ pr)
-  {co : α → code × code × σ × σ → σ} (hco : computable₂ co)
-  {pc : α → code × code × σ × σ → σ} (hpc : computable₂ pc)
-  {rf : α → code × σ → σ} (hrf : computable₂ rf) :
+theorem rec_computable {α σ} {O : ℕ → ℕ} [primcodable α] [primcodable σ]
+  {c : α → code} (hc : computable O c)
+  {z : α → σ} (hz : computable O z)
+  {s : α → σ} (hs : computable O s)
+  {l : α → σ} (hl : computable O l)
+  {r : α → σ} (hr : computable O r)
+  {pr : α → code × code × σ × σ → σ} (hpr : computable₂ O pr)
+  {co : α → code × code × σ × σ → σ} (hco : computable₂ O co)
+  {pc : α → code × code × σ × σ → σ} (hpc : computable₂ O pc)
+  {rf : α → code × σ → σ} (hrf : computable₂ O rf) :
 let PR (a) := λ cf cg hf hg, pr a (cf, cg, hf, hg),
     CO (a) := λ cf cg hf hg, co a (cf, cg, hf, hg),
     PC (a) := λ cf cg hf hg, pc a (cf, cg, hf, hg),
     RF (a) := λ cf hf, rf a (cf, hf),
     F (a c) : σ := nat.partrec.code.rec_on c
       (z a) (s a) (l a) (r a) (PR a) (CO a) (PC a) (RF a) in
-    computable (λ a, F a (c a)) :=
+    computable O (λ a, F a (c a)) :=
 begin
   intros,
   let G₁ : (α × list σ) × ℕ × ℕ → option σ := λ p,
@@ -418,7 +418,7 @@ begin
       (cond n.div2.bodd
         (co a (of_nat code m.unpair.1, of_nat code m.unpair.2, s₁, s₂))
         (pr a (of_nat code m.unpair.1, of_nat code m.unpair.2, s₁, s₂))),
-  have : computable G₁,
+  have : computable O G₁,
   { refine option_bind (list_nth.comp (snd.comp fst) (snd.comp snd)) _,
     refine option_bind ((list_nth.comp (snd.comp fst)
       (fst.comp $ computable.unpair.comp (snd.comp snd))).comp fst) _,
@@ -448,7 +448,7 @@ begin
     n.cases (some (l a)) $ λ n,
     n.cases (some (r a)) $ λ n,
     G₁ ((a, IH), n, n.div2.div2),
-  have : computable₂ G := (nat_cases
+  have : computable₂ O G := (nat_cases
     (list_length.comp snd) (option_some_iff.2 (hz.comp fst)) $
     nat_cases snd (option_some_iff.2 (hs.comp (fst.comp fst))) $
     nat_cases snd (option_some_iff.2 (hl.comp (fst.comp $ fst.comp fst))) $
@@ -518,11 +518,11 @@ theorem curry_inj {c₁ c₂ n₁ n₂} (h : curry c₁ n₁ = curry c₂ n₂) 
                       injection h₂ with h₃ h₄,
                       exact const_inj h₃ }⟩
 
-theorem smn : ∃ f : code → ℕ → code,
-  computable₂ f ∧ ∀ c n x, eval (f c n) x = eval c (mkpair n x) :=
+theorem smn {O : ℕ → ℕ} : ∃ f : code → ℕ → code,
+  computable₂ O f ∧ ∀ c n x, eval (f c n) x = eval c (mkpair n x) :=
 ⟨curry, primrec₂.to_comp curry_prim, eval_curry⟩
 
-theorem exists_code {f : ℕ →. ℕ} : nat.partrec f ↔ ∃ c : code, eval c = f :=
+theorem exists_code {O : ℕ → ℕ} {f : ℕ →. ℕ} : nat.partrec O f ↔ ∃ c : code, eval c = f :=
 ⟨λ h, begin
   induction h,
   case nat.partrec.zero { exact ⟨zero, rfl⟩ },
@@ -542,6 +542,9 @@ theorem exists_code {f : ℕ →. ℕ} : nat.partrec f ↔ ∃ c : code, eval c 
     rcases hf with ⟨cf, rfl⟩,
     refine ⟨comp (rfind' cf) (pair code.id zero), _⟩,
     simp [eval, (<*>), pure, pfun.pure, roption.map_id'] },
+  case nat.partrec.oracle {
+
+  }
 end, λ h, begin
   rcases h with ⟨c, rfl⟩, induction c,
   case nat.partrec.code.zero { exact nat.partrec.zero },
@@ -898,23 +901,23 @@ roption.ext $ λ x, begin
   intros a m n hl, apply evaln_mono hl,
 end
 
-theorem eval_part : partrec₂ eval :=
+theorem eval_part {O : ℕ → ℕ} : partrec₂ O eval :=
 (rfind_opt (evaln_prim.to_comp.comp
   ((snd.pair (fst.comp fst)).pair (snd.comp fst))).to₂).of_eq $
 λ a, by simp [eval_eq_rfind_opt]
 
 theorem fixed_point
-  {f : code → code} (hf : computable f) : ∃ c : code, eval (f c) = eval c :=
+  (O : ℕ → ℕ) {f : code → code} (hf : computable O f) : ∃ c : code, eval (f c) = eval c :=
 let g (x y : ℕ) : roption ℕ :=
   eval (of_nat code x) x >>= λ b, eval (of_nat code b) y in
-have partrec₂ g :=
+have partrec₂ O g :=
   (eval_part.comp ((computable.of_nat _).comp fst) fst).bind
   (eval_part.comp ((computable.of_nat _).comp snd) (snd.comp fst)).to₂,
 let ⟨cg, eg⟩ := exists_code.1 this in
 have eg' : ∀ a n, eval cg (mkpair a n) = roption.map encode (g a n) :=
   by simp [eg],
 let F (x : ℕ) : code := f (curry cg x) in
-have computable F :=
+have computable O F :=
   hf.comp (curry_prim.comp (primrec.const cg) primrec.id).to_comp,
 let ⟨cF, eF⟩ := exists_code.1 this in
 have eF' : eval cF (encode cF) = roption.some (encode (F (encode cF))),
@@ -924,9 +927,9 @@ have eF' : eval cF (encode cF) = roption.some (encode (F (encode cF))),
   by simp [eg', eF', roption.map_id', g])⟩
 
 theorem fixed_point₂
-  {f : code → ℕ →. ℕ} (hf : partrec₂ f) : ∃ c : code, eval c = f c :=
+  {O : ℕ → ℕ} {f : code → ℕ →. ℕ} (hf : partrec₂ O f) : ∃ c : code, eval c = f c :=
 let ⟨cf, ef⟩ := exists_code.1 hf in
-(fixed_point (curry_prim.comp
+(fixed_point O (curry_prim.comp
   (primrec.const cf) primrec.encode).to_comp).imp $
 λ c e, funext $ λ n, by simp [e.symm, ef, roption.map_id']
 

@@ -723,3 +723,83 @@ have hp : partrec₂ p := hF.map ((sum_cases computable.id
 λ a, ext $ λ b, by simp; apply fix_aux hf
 
 end partrec
+
+namespace turing_reduction
+
+def oracle_list : (ℕ → ℕ) → ℕ → list ℕ
+| f 0 := [f 0]
+| f (n + 1) := (oracle_list f n) ++ [f (n + 1)]
+
+def reverse_oracle_list : (ℕ → ℕ) → ℕ → list ℕ
+| f 0 := [f 0]
+| f (n + 1) := f (n + 1) :: reverse_oracle_list f n
+
+/-
+TODO: Delete previous tries when the right definition is settled
+def turing_reduces (A : ℕ → ℕ) (B : ℕ → ℕ) := ∃ (b : list ℕ) (f : list ℕ → ℕ → ℕ),
+  (∀ i < b.length, b.nth i = B i) ∧ computable₂ f ∧ f b = A
+
+def turing_reduces (A : ℕ → ℕ) (B : ℕ → ℕ) := ∃ (m : ℕ) (f : list ℕ → ℕ → ℕ),
+  computable₂ f ∧ f (reverse_oracle_list B m) = A
+
+lemma turing_reduction_id (A : ℕ → ℕ) : turing_reduces A A :=
+  let f : list ℕ → ℕ → ℕ := λ _ n, A n in
+begin
+  apply exists.intro [],
+  apply exists.intro f,
+  apply and.intro,
+  simp,
+  apply and.intro,
+  {
+    sorry
+  },
+  simp
+end
+
+def turing_reduces_one_entry (A : ℕ → ℕ) (B : ℕ → ℕ) (n : ℕ) :=
+  ∃ (b : list ℕ) (f : list ℕ → ℕ → ℕ),
+  (∀ i < b.length, b.nth i = B(i)) ∧ computable₂ f ∧ f b n = A n
+
+def turing_reduces_one_entry₂ (A : ℕ → ℕ) (B : ℕ → ℕ) (n : ℕ) :=
+  ∃ (m : ℕ) (f : list ℕ → ℕ → ℕ), computable₂ f ∧ f (oracle_list B m) n = A n
+-/
+
+def turing_reduces_one_entry (A : ℕ → ℕ) (B : ℕ → ℕ) (n : ℕ) :=
+  ∃ (m : ℕ) (f : list ℕ → ℕ → ℕ), computable₂ f ∧ f (reverse_oracle_list B m) n = A n
+
+def turing_reduces (A : ℕ → ℕ) (B : ℕ → ℕ) := ∀ n : ℕ, turing_reduces_one_entry A B n
+
+def turing_equivalent (A : ℕ → ℕ) (B : ℕ → ℕ) := turing_reduces A B ∧ turing_reduces B A
+
+def oracle_head (l : list ℕ) {n : ℕ} := list.head l
+
+lemma turing_reduction_id_one_entry (A : ℕ → ℕ) (n : ℕ) :
+  turing_reduces_one_entry A A n :=
+begin
+  apply exists.intro n,
+  apply exists.intro (oracle_head),
+  apply and.intro,
+  {
+    apply primrec₂.to_comp,
+    apply primrec.comp₂ primrec.list_head primrec₂.left
+  },
+  {
+    simp[oracle_head],
+    cases n,
+    {
+      simp[reverse_oracle_list]
+    },
+    {
+      simp[reverse_oracle_list, nat.succ_eq_add_one],
+    }
+  }
+end
+
+theorem turing_reduction_id (A : ℕ → ℕ) : turing_reduces A A :=
+assume n : ℕ,
+turing_reduction_id_one_entry A n
+
+theorem turing_equiv_id (A : ℕ → ℕ) : turing_equivalent A A :=
+and.intro (turing_reduction_id A) (turing_reduction_id A)
+
+end turing_reduction

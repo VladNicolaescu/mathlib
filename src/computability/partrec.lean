@@ -6,6 +6,7 @@ Author: Mario Carneiro
 import computability.primrec
 import data.nat.psub
 import data.pfun
+import tactic.linarith
 
 /-!
 # The partial recursive functions
@@ -734,72 +735,71 @@ def reverse_oracle_list : (ℕ → ℕ) → ℕ → list ℕ
 | f 0 := [f 0]
 | f (n + 1) := f (n + 1) :: reverse_oracle_list f n
 
-/-
-TODO: Delete previous tries when the right definition is settled
-def turing_reduces (A : ℕ → ℕ) (B : ℕ → ℕ) := ∃ (b : list ℕ) (f : list ℕ → ℕ → ℕ),
-  (∀ i < b.length, b.nth i = B i) ∧ computable₂ f ∧ f b = A
+def turing_reduces (A : ℕ → ℕ) (B : ℕ → ℕ) :=
+  ∃ f : list ℕ → ℕ → option ℕ, computable₂ f ∧ ∀ n, ∃ M, ∀ m > M, f (oracle_list B m) n = A n
 
-def turing_reduces (A : ℕ → ℕ) (B : ℕ → ℕ) := ∃ (m : ℕ) (f : list ℕ → ℕ → ℕ),
-  computable₂ f ∧ f (reverse_oracle_list B m) = A
-
-lemma turing_reduction_id (A : ℕ → ℕ) : turing_reduces A A :=
-  let f : list ℕ → ℕ → ℕ := λ _ n, A n in
+lemma oracle_list_length {A : ℕ → ℕ} {n : ℕ} : list.length (oracle_list A n) = n + 1 :=
 begin
-  apply exists.intro [],
-  apply exists.intro f,
-  apply and.intro,
-  simp,
-  apply and.intro,
-  {
-    sorry
-  },
-  simp
+  induction n with n ih,
+  { simp[oracle_list] },
+  { simp[oracle_list, ih] }
 end
 
-def turing_reduces_one_entry (A : ℕ → ℕ) (B : ℕ → ℕ) (n : ℕ) :=
-  ∃ (b : list ℕ) (f : list ℕ → ℕ → ℕ),
-  (∀ i < b.length, b.nth i = B(i)) ∧ computable₂ f ∧ f b n = A n
-
-def turing_reduces_one_entry₂ (A : ℕ → ℕ) (B : ℕ → ℕ) (n : ℕ) :=
-  ∃ (m : ℕ) (f : list ℕ → ℕ → ℕ), computable₂ f ∧ f (oracle_list B m) n = A n
--/
-
-def turing_reduces_one_entry (A : ℕ → ℕ) (B : ℕ → ℕ) (n : ℕ) :=
-  ∃ (m : ℕ) (f : list ℕ → ℕ → ℕ), computable₂ f ∧ f (reverse_oracle_list B m) n = A n
-
-def turing_reduces (A : ℕ → ℕ) (B : ℕ → ℕ) := ∀ n : ℕ, turing_reduces_one_entry A B n
-
-def turing_equivalent (A : ℕ → ℕ) (B : ℕ → ℕ) := turing_reduces A B ∧ turing_reduces B A
-
-def oracle_head (l : list ℕ) {n : ℕ} := list.head l
-
-lemma turing_reduction_id_one_entry (A : ℕ → ℕ) (n : ℕ) :
-  turing_reduces_one_entry A A n :=
+lemma oracle_last_value {A : ℕ → ℕ} {n : ℕ} : (oracle_list A n).nth n = A n :=
 begin
-  apply exists.intro n,
-  apply exists.intro (oracle_head),
-  apply and.intro,
+  cases n,
   {
-    apply primrec₂.to_comp,
-    apply primrec.comp₂ primrec.list_head primrec₂.left
+    simp[oracle_list],
+    finish
   },
   {
-    simp[oracle_head],
-    cases n,
+    simp[oracle_list, nat.succ_eq_add_one],
+    have hlen : (oracle_list A n).length ≤ n + 1 := by simp[oracle_list_length],
+    simp[list.nth_append_right hlen, oracle_list_length],
+    finish
+  }
+end
+
+lemma oracle_list_nth {A : ℕ → ℕ} {n : ℕ} : ∀ m > n, (oracle_list A m).nth n = A n :=
+begin
+  intros m h,
+  induction m with m ih,
+  {
+    apply false.elim,
+    apply nat.not_lt_zero n,
+    exact h
+  },
+  {
+    simp[oracle_list] at *,
+    have hlen : n < (oracle_list A m).length :=
+    begin
+      simp[oracle_list_length],
+      apply h
+    end,
+    have happ : (oracle_list A m ++ [A (m + 1)]).nth n = (oracle_list A m).nth n :=
+      by apply list.nth_append hlen,
+    simp[happ],
+    cases classical.em (n < m) with hless hnless,
+    { apply ih hless },
     {
-      simp[reverse_oracle_list]
-    },
-    {
-      simp[reverse_oracle_list, nat.succ_eq_add_one],
+      have hnm : n = m :=
+      begin
+        simp[nat.succ_eq_add_one] at h,
+        linarith,
+      end,
+      simp[hnm],
+      apply oracle_last_value
     }
   }
 end
 
-theorem turing_reduction_id (A : ℕ → ℕ) : turing_reduces A A :=
-assume n : ℕ,
-turing_reduction_id_one_entry A n
-
-theorem turing_equiv_id (A : ℕ → ℕ) : turing_equivalent A A :=
-and.intro (turing_reduction_id A) (turing_reduction_id A)
+lemma turing_reduces.refl {A} : turing_reduces A A :=
+begin
+  apply exists.intro (λ (l : list ℕ) (n : ℕ), l.nth n),
+  apply and.intro computable.list_nth,
+  intro n,
+  apply exists.intro n,
+  apply oracle_list_nth
+end
 
 end turing_reduction

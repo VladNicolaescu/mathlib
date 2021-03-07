@@ -6,7 +6,6 @@ Author: Mario Carneiro
 import computability.primrec
 import data.nat.psub
 import data.pfun
-import tactic.linarith
 
 /-!
 # The partial recursive functions
@@ -731,14 +730,10 @@ def oracle_list : (ℕ → ℕ) → ℕ → list ℕ
 | f 0 := [f 0]
 | f (n + 1) := (oracle_list f n) ++ [f (n + 1)]
 
-def reverse_oracle_list : (ℕ → ℕ) → ℕ → list ℕ
-| f 0 := [f 0]
-| f (n + 1) := f (n + 1) :: reverse_oracle_list f n
-
 def turing_reduces (A : ℕ → ℕ) (B : ℕ → ℕ) :=
   ∃ f : list ℕ → ℕ → option ℕ, computable₂ f ∧ ∀ n, ∃ M, ∀ m > M, f (oracle_list B m) n = A n
 
-lemma oracle_list_length {A : ℕ → ℕ} {n : ℕ} : list.length (oracle_list A n) = n + 1 :=
+lemma oracle_list_length {A : ℕ → ℕ} {n : ℕ} : (oracle_list A n).length = n + 1 :=
 begin
   induction n with n ih,
   { simp[oracle_list] },
@@ -748,14 +743,10 @@ end
 lemma oracle_last_value {A : ℕ → ℕ} {n : ℕ} : (oracle_list A n).nth n = A n :=
 begin
   cases n,
-  {
-    simp[oracle_list],
-    finish
-  },
+  { finish },
   {
     simp[oracle_list, nat.succ_eq_add_one],
-    have hlen : (oracle_list A n).length ≤ n + 1 := by simp[oracle_list_length],
-    simp[list.nth_append_right hlen, oracle_list_length],
+    simp[list.nth_append_right (eq.le oracle_list_length), oracle_list_length],
     finish
   }
 end
@@ -764,30 +755,23 @@ lemma oracle_list_nth {A : ℕ → ℕ} {n : ℕ} : ∀ m > n, (oracle_list A m)
 begin
   intros m h,
   induction m with m ih,
+  { cases h },
   {
-    apply false.elim,
-    apply nat.not_lt_zero n,
-    exact h
-  },
-  {
-    simp[oracle_list] at *,
+    simp[oracle_list],
     have hlen : n < (oracle_list A m).length :=
     begin
       simp[oracle_list_length],
-      apply h
+      exact h
     end,
-    have happ : (oracle_list A m ++ [A (m + 1)]).nth n = (oracle_list A m).nth n :=
-      by apply list.nth_append hlen,
-    simp[happ],
-    cases classical.em (n < m) with hless hnless,
-    { apply ih hless },
+    apply eq.trans (list.nth_append hlen),
+    apply or.elim (iff.elim_left nat.lt_succ_iff_lt_or_eq h),
     {
-      have hnm : n = m :=
-      begin
-        simp[nat.succ_eq_add_one] at h,
-        linarith,
-      end,
-      simp[hnm],
+      intro hless,
+      apply ih hless
+    },
+    {
+      intro heq,
+      simp[heq],
       apply oracle_last_value
     }
   }

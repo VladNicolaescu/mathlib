@@ -786,4 +786,52 @@ begin
   apply oracle_list_nth
 end
 
+lemma turing_reduces.comp {A₁ A₂ B} :
+  turing_reduces A₁ B → turing_reduces A₂ B → turing_reduces (A₁ ∘ A₂) B :=
+begin
+  intros h1 h2,
+  apply exists.elim h1,
+  intros f1 hf1,
+  apply exists.elim h2,
+  intros f2 hf2,
+  apply exists.intro (λ l n, f1 l (A₂ n)),
+  apply and.intro,
+  {
+    have hcomp1 : computable₂ f1 := and.elim_left hf1,
+    apply (and.elim_left hf1).comp₂,
+    { apply primrec.to_comp primrec.fst },
+    {
+      apply computable.comp₂,
+      { sorry },
+      { apply primrec.to_comp primrec.snd }
+    }
+  },
+  {
+    intro n,
+    apply exists.elim (and.elim_right hf1 (A₂ n)),
+    intros a ha,
+    apply exists.intro a,
+    intros m hm,
+    apply ha m hm
+  }
+end
+
+lemma computable.to_turing_reduces {f B} : computable f → turing_reduces f B :=
+begin
+  intro hf,
+  apply exists.intro (λ (l : list ℕ) (n : ℕ), option.some (f n)),
+  apply and.intro,
+  {
+    apply computable.comp₂ computable.option_some,
+    apply hf.comp₂,
+    apply primrec.to_comp primrec.snd
+  },
+  {
+    intro n,
+    apply exists.intro 0,
+    intros m hm,
+    finish
+  }
+end
+
 end turing_reduction

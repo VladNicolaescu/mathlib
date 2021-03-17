@@ -797,7 +797,6 @@ begin
   apply exists.intro (λ l n, f1 l (A₂ n)),
   apply and.intro,
   {
-    have hcomp1 : computable₂ f1 := and.elim_left hf1,
     apply (and.elim_left hf1).comp₂,
     { apply primrec.to_comp primrec.fst },
     {

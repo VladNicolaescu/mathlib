@@ -777,6 +777,31 @@ begin
   }
 end
 
+lemma oracle_list_nth₂ {A : ℕ → ℕ} {n : ℕ} : ∀ m ≥ n, (oracle_list A m).nth n = A n :=
+  begin
+    intros m h,
+    induction m with m ih,
+    {
+      cases h,
+      finish
+    },
+    {
+      cases h with _ hnm,
+      { apply oracle_last_value },
+      {
+        simp[oracle_list],
+        have hnth : (oracle_list A m ++ [A (m + 1)]).nth n = (oracle_list A m).nth n :=
+        begin
+          apply list.nth_append,
+          simp[oracle_list_length],
+          apply nat.lt_succ_iff.mpr hnm
+        end,
+        simp[hnth],
+        apply ih hnm
+      }
+    }
+  end
+
 lemma turing_reduces.refl {A} : turing_reduces A A :=
 begin
   apply exists.intro (λ (l : list ℕ) (n : ℕ), l.nth n),
@@ -794,24 +819,28 @@ begin
   intros f1 hf1,
   apply exists.elim h2,
   intros f2 hf2,
-  apply exists.intro (λ l n, f1 l (A₂ n)),
+  apply exists.intro (λ l n, (f2 l n).bind (λ m, f1 l m)),
   apply and.intro,
   {
+    apply computable.option_bind (and.elim_left hf2),
     apply (and.elim_left hf1).comp₂,
-    { apply primrec.to_comp primrec.fst },
     {
       apply computable.comp₂,
-      { sorry },
-      { apply primrec.to_comp primrec.snd }
-    }
+      { apply computable.fst },
+      { apply primrec₂.to_comp primrec₂.left }
+    },
+    { apply primrec.to_comp primrec.snd }
   },
   {
     intro n,
     apply exists.elim (and.elim_right hf1 (A₂ n)),
     intros a ha,
-    apply exists.intro a,
+    apply exists.elim (and.elim_right hf2 n),
+    intros b hb,
+    apply exists.intro (max a b),
     intros m hm,
-    apply ha m hm
+    simp[hb m (lt_of_le_of_lt (le_max_right a b) hm)],
+    apply ha m (lt_of_le_of_lt (le_max_left a b) hm)
   }
 end
 

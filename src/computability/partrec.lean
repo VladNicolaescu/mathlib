@@ -804,26 +804,22 @@ lemma oracle_list_nth₂ {A : ℕ → ℕ} {n : ℕ} : ∀ m ≥ n, (oracle_list
 
 lemma turing_reduces.refl {A} : turing_reduces A A :=
 begin
-  apply exists.intro (λ (l : list ℕ) (n : ℕ), l.nth n),
+  use (λ (l : list ℕ) (n : ℕ), l.nth n),
   apply and.intro computable.list_nth,
   intro n,
-  apply exists.intro n,
+  use n,
   apply oracle_list_nth
 end
 
 lemma turing_reduces.comp {A₁ A₂ B} :
   turing_reduces A₁ B → turing_reduces A₂ B → turing_reduces (A₁ ∘ A₂) B :=
 begin
-  intros h1 h2,
-  apply exists.elim h1,
-  intros f1 hf1,
-  apply exists.elim h2,
-  intros f2 hf2,
-  apply exists.intro (λ l n, (f2 l n).bind (λ m, f1 l m)),
+  rintros ⟨f1, hf1comp, hf1⟩ ⟨f2, hf2comp, hf2⟩,
+  use (λ l n, (f2 l n).bind (λ m, f1 l m)),
   apply and.intro,
   {
-    apply computable.option_bind (and.elim_left hf2),
-    apply (and.elim_left hf1).comp₂,
+    apply computable.option_bind hf2comp,
+    apply hf1comp.comp₂,
     {
       apply computable.comp₂,
       { apply computable.fst },
@@ -833,11 +829,11 @@ begin
   },
   {
     intro n,
-    apply exists.elim (and.elim_right hf1 (A₂ n)),
+    apply exists.elim (hf1 (A₂ n)),
     intros a ha,
-    apply exists.elim (and.elim_right hf2 n),
+    apply exists.elim (hf2 n),
     intros b hb,
-    apply exists.intro (max a b),
+    use (max a b),
     intros m hm,
     simp[hb m (lt_of_le_of_lt (le_max_right a b) hm)],
     apply ha m (lt_of_le_of_lt (le_max_left a b) hm)
@@ -847,7 +843,7 @@ end
 lemma computable.to_turing_reduces {f B} : computable f → turing_reduces f B :=
 begin
   intro hf,
-  apply exists.intro (λ (l : list ℕ) (n : ℕ), option.some (f n)),
+  use (λ (l : list ℕ) (n : ℕ), option.some (f n)),
   apply and.intro,
   {
     apply computable.comp₂ computable.option_some,
@@ -856,7 +852,7 @@ begin
   },
   {
     intro n,
-    apply exists.intro 0,
+    use 0,
     intros m hm,
     finish
   }

@@ -724,20 +724,38 @@ have hp : partrec₂ p := hF.map ((sum_cases computable.id
 
 end partrec
 
-namespace turing_reduction
+namespace rel_computable
 
 def oracle_list : (ℕ → ℕ) → ℕ → list ℕ
 | f 0 := [f 0]
 | f (n + 1) := (oracle_list f n) ++ [f (n + 1)]
 
-def turing_reduces (A : ℕ → ℕ) (B : ℕ → ℕ) :=
+def oracle_list_primcodable {α σ} [primcodable α] [primcodable σ] : (option α → σ) → ℕ → list σ
+| f 0 := [f (decode α 0)]
+| f (n + 1) := (oracle_list_primcodable f n) ++ [f (decode α (n + 1))]
+
+def rel_computable (A : ℕ → ℕ) (B : ℕ → ℕ) :=
   ∃ f : list ℕ → ℕ → option ℕ, computable₂ f ∧ ∀ n, ∃ M, ∀ m > M, f (oracle_list B m) n = A n
+
+def rel_computable_primcodable {α σ β γ}
+  [primcodable α] [primcodable σ] [primcodable β] [primcodable γ]
+  (A : option α → σ) (B : option β → γ) :=
+  ∃ f : list γ → option α → option σ, computable₂ f ∧ ∀ n, ∃ M, ∀ m > M,
+    f (oracle_list_primcodable B m) (decode α n) = A (decode α n)
 
 lemma oracle_list_length {A : ℕ → ℕ} {n : ℕ} : (oracle_list A n).length = n + 1 :=
 begin
   induction n with n ih,
   { simp[oracle_list] },
   { simp[oracle_list, ih] }
+end
+
+lemma oracle_list_length_primcodable {α σ} [primcodable α] [primcodable σ]
+  {A : option α → σ} {n : ℕ} : (oracle_list_primcodable A n).length = n + 1 :=
+begin
+  induction n with n ih,
+  { simp[oracle_list_primcodable] },
+  { simp[oracle_list_primcodable, ih] }
 end
 
 lemma oracle_last_value {A : ℕ → ℕ} {n : ℕ} : (oracle_list A n).nth n = A n :=
@@ -751,68 +769,99 @@ begin
   }
 end
 
-lemma oracle_list_nth {A : ℕ → ℕ} {n : ℕ} : ∀ m > n, (oracle_list A m).nth n = A n :=
+lemma oracle_last_value_primcodable {α σ} [primcodable α] [primcodable σ]
+  {A : option α → σ} {n : ℕ} : (oracle_list_primcodable A n).nth n = A (decode α n) :=
+begin
+  cases n,
+  { finish },
+  {
+    simp[oracle_list_primcodable, nat.succ_eq_add_one],
+    simp[list.nth_append_right (eq.le oracle_list_length_primcodable),
+          oracle_list_length_primcodable],
+    finish
+  }
+end
+
+lemma oracle_list_nth {A : ℕ → ℕ} {n : ℕ} : ∀ m ≥ n, (oracle_list A m).nth n = A n :=
 begin
   intros m h,
   induction m with m ih,
-  { cases h },
   {
-    simp[oracle_list],
-    have hlen : n < (oracle_list A m).length :=
-    begin
-      simp[oracle_list_length],
-      exact h
-    end,
-    apply eq.trans (list.nth_append hlen),
-    apply or.elim (iff.elim_left nat.lt_succ_iff_lt_or_eq h),
+    cases h,
+    finish
+  },
+  {
+    cases h with _ hnm,
+    { apply oracle_last_value },
     {
-      intro hless,
-      apply ih hless
-    },
-    {
-      intro heq,
-      simp[heq],
-      apply oracle_last_value
+      rw [oracle_list, list.nth_append, ih hnm],
+      rwa [oracle_list_length, nat.lt_succ_iff]
     }
   }
 end
 
-lemma oracle_list_nth₂ {A : ℕ → ℕ} {n : ℕ} : ∀ m ≥ n, (oracle_list A m).nth n = A n :=
-  begin
-    intros m h,
-    induction m with m ih,
+lemma oracle_list_nth_primcodable {α σ} [primcodable α] [primcodable σ] {A : option α → σ} {n : ℕ} :
+  ∀ m ≥ n, (oracle_list_primcodable A m).nth n = A (decode α n) :=
+begin
+  intros m h,
+  induction m with m ih,
+  {
+    cases h,
+    finish
+  },
+  {
+    cases h with _ hnm,
+    { apply oracle_last_value_primcodable },
     {
-      cases h,
-      finish
-    },
-    {
-      cases h with _ hnm,
-      { apply oracle_last_value },
-      {
-        simp[oracle_list],
-        have hnth : (oracle_list A m ++ [A (m + 1)]).nth n = (oracle_list A m).nth n :=
-        begin
-          apply list.nth_append,
-          simp[oracle_list_length],
-          apply nat.lt_succ_iff.mpr hnm
-        end,
-        simp[hnth],
-        apply ih hnm
-      }
+      rw [oracle_list_primcodable, list.nth_append, ih hnm],
+      rwa [oracle_list_length_primcodable, nat.lt_succ_iff]
     }
-  end
+  }
+end
 
-lemma turing_reduces.refl {A} : turing_reduces A A :=
+lemma rel_computable.refl {A} : rel_computable A A :=
 begin
   use (λ (l : list ℕ) (n : ℕ), l.nth n),
   apply and.intro computable.list_nth,
   intro n,
   use n,
-  apply oracle_list_nth
+  intros m h,
+  apply oracle_list_nth m (nat.le_of_lt h)
 end
 
-lemma turing_reduces.comp {A₁ A₂ B} :
-  turing_reduces A₁ B → turing_reduces A₂ B → turing_reduces (A₁ ∘ A₂) B :=
+def refl_function {α σ} [primcodable α] (A : option α → σ) : list σ → option α → option σ
+| l none     := A none
+| l (some a) := l.nth (encode a)
+
+lemma rel_computable.refl_primcodable {α σ} [primcodable α] [primcodable σ] {A : option α → σ} :
+  rel_computable_primcodable A A :=
+begin
+  use refl_function A,
+  apply and.intro,
+  {
+    sorry
+  },
+  {
+    intro n,
+    cases (decode α n),
+    { simp[refl_function] },
+    {
+      use (encode val),
+      simp[refl_function],
+      have henc : option.some val = decode α (encode val) :=
+      begin
+        apply eq.symm,
+        exact encodek val
+      end,
+      rw henc,
+      intros m h,
+      apply oracle_list_nth_primcodable m (nat.le_of_lt h)
+    }
+  }
+end
+
+lemma rel_computable.comp {A₁ A₂ B} :
+  rel_computable A₁ B → rel_computable A₂ B → rel_computable (A₁ ∘ A₂) B :=
 begin
   rintros ⟨f1, hf1comp, hf1⟩ ⟨f2, hf2comp, hf2⟩,
   use (λ l n, (f2 l n).bind (λ m, f1 l m)),
@@ -840,7 +889,7 @@ begin
   }
 end
 
-lemma computable.to_turing_reduces {f B} : computable f → turing_reduces f B :=
+lemma computable.to_rel_computable {f B} : computable f → rel_computable f B :=
 begin
   intro hf,
   use (λ (l : list ℕ) (n : ℕ), option.some (f n)),
@@ -858,4 +907,9 @@ begin
   }
 end
 
-end turing_reduction
+/-theorem rel_computable.nat_strong_rec (f : ℕ → ℕ → ℕ) (g : ℕ × list ℕ → option ℕ) :
+    rel_computable g B →
+    (∀ a n, g (a, list.map (f a) (list.range n)) = some (f a n)) →
+    rel_computable f B-/
+
+end rel_computable

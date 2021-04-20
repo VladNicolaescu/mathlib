@@ -290,6 +290,7 @@ theorem sum_inr : computable (@sum.inr α β) := primrec.sum_inr.to_comp
 theorem list_cons : computable₂ (@list.cons α) := primrec.list_cons.to_comp
 theorem list_reverse : computable (@list.reverse α) := primrec.list_reverse.to_comp
 theorem list_nth : computable₂ (@list.nth α) := primrec.list_nth.to_comp
+theorem list_inth [inhabited α] : computable₂ (@list.inth α) := primrec.list_inth.to_comp
 theorem list_append : computable₂ ((++) : list α → list α → list α) := primrec.list_append.to_comp
 theorem list_concat : computable₂ (λ l (a:α), l ++ [a]) := primrec.list_concat.to_comp
 theorem list_length : computable (@list.length α) := primrec.list_length.to_comp

@@ -741,21 +741,21 @@ def rel_computable_primcodable {α σ β γ}
   [primcodable α] [primcodable σ] [primcodable β] [primcodable γ]
   (A : α → σ) (B : β → γ) :=
   ∃ f : list (option γ) → α → option σ, computable₂ f ∧ ∀ x, ∃ M, ∀ m > M,
-    f (oracle_list_primcodable B m) x = A x
+    f (oracle_list_primcodable B m) x = some (A x)
 
 lemma oracle_list_length {A : ℕ → ℕ} {n : ℕ} : (oracle_list A n).length = n + 1 :=
 begin
   induction n with n ih,
-  { simp[oracle_list] },
-  { simp[oracle_list, ih] }
+  { simp [oracle_list] },
+  { simp [oracle_list, ih] }
 end
 
 lemma oracle_list_length_primcodable {α σ} [primcodable α] [primcodable σ]
   {A : α → σ} {n : ℕ} : (oracle_list_primcodable A n).length = n + 1 :=
 begin
   induction n with n ih,
-  { simp[oracle_list_primcodable] },
-  { simp[oracle_list_primcodable, ih] }
+  { simp [oracle_list_primcodable] },
+  { simp [oracle_list_primcodable, ih] }
 end
 
 lemma oracle_last_value {A : ℕ → ℕ} {n : ℕ} : (oracle_list A n).nth n = A n :=
@@ -763,24 +763,24 @@ begin
   cases n,
   { finish },
   {
-    simp[oracle_list, nat.succ_eq_add_one],
-    simp[list.nth_append_right (eq.le oracle_list_length), oracle_list_length],
+    simp [oracle_list, nat.succ_eq_add_one],
+    simp [list.nth_append_right (eq.le oracle_list_length), oracle_list_length],
     finish
   }
 end
 
-/-lemma oracle_last_value_primcodable {α σ} [primcodable α] [primcodable σ]
-  {A : α → σ} {n : ℕ} : (oracle_list_primcodable A n).nth n = A (decode α n) :=
+lemma oracle_last_value_primcodable {α σ} [primcodable α] [primcodable σ] {A : α → σ} {n : ℕ} :
+  (oracle_list_primcodable A n).nth_le n (by simp [oracle_list_length_primcodable]) =
+    option.map A (decode α n) :=
 begin
   cases n,
   { finish },
   {
-    simp[oracle_list_primcodable, nat.succ_eq_add_one],
-    simp[list.nth_append_right (eq.le oracle_list_length_primcodable),
-          oracle_list_length_primcodable],
-    finish
+    simp [oracle_list_primcodable, nat.succ_eq_add_one],
+    simp [list.nth_le_append_right (eq.le oracle_list_length_primcodable),
+          oracle_list_length_primcodable]
   }
-end-/
+end
 
 lemma oracle_list_nth {A : ℕ → ℕ} {n : ℕ} : ∀ m ≥ n, (oracle_list A m).nth n = A n :=
 begin
@@ -800,8 +800,9 @@ begin
   }
 end
 
-/-lemma oracle_list_nth_primcodable {α σ} [primcodable α] [primcodable σ] {A : α → option σ} {n : ℕ} :
-  ∀ m ≥ n, (oracle_list_primcodable A m).nth n = A (decode α n) :=
+lemma oracle_list_nth_primcodable {α σ} [primcodable α] [primcodable σ] {A : α → σ} {n : ℕ} :
+  ∀ m ≥ n, (oracle_list_primcodable A m).nth_le n
+    (by rwa [oracle_list_length_primcodable, nat.lt_succ_iff]) = option.map A (decode α n) :=
 begin
   intros m h,
   induction m with m ih,
@@ -813,11 +814,16 @@ begin
     cases h with _ hnm,
     { apply oracle_last_value_primcodable },
     {
-      rw [oracle_list_primcodable, list.nth_append, ih hnm],
-      rwa [oracle_list_length_primcodable, nat.lt_succ_iff]
+      simp [oracle_list_primcodable],
+      have hnlen : n < (oracle_list_primcodable A m ++ [option.map A (decode α (m + 1))]).length :=
+      begin
+        simp [oracle_list_length_primcodable],
+        apply nat.lt_succ_iff.mpr h
+      end,
+      rw [list.nth_le_append (hnlen) (by rwa [oracle_list_length_primcodable, nat.lt_succ_iff]), ih hnm]
     }
   }
-end-/
+end
 
 lemma rel_computable.refl {A} : rel_computable A A :=
 begin
@@ -829,32 +835,12 @@ begin
   apply oracle_list_nth m (nat.le_of_lt h)
 end
 
-/-lemma rel_computable.refl_primcodable {α σ} [primcodable α] [primcodable σ] {A : α → σ} :
+lemma rel_computable.refl_primcodable {α σ} [primcodable α] [primcodable σ] {A : α → σ} :
   rel_computable_primcodable A A :=
 begin
-  use (λ (l : list ℕ) (n : ℕ), l.nth n),
-  apply and.intro,
-  {
-    sorry
-  },
-  {
-    intro n,
-    cases (decode α n),
-    { simp[refl_function] },
-    {
-      use (encode val),
-      simp[refl_function],
-      have henc : option.some val = decode α (encode val) :=
-      begin
-        apply eq.symm,
-        exact encodek val
-      end,
-      rw henc,
-      intros m h,
-      apply oracle_list_nth_primcodable m (nat.le_of_lt h)
-    }
-  }
-end-/
+  use (λ (l : list (option σ)) (a : α), l.inth (encode a)),
+  sorry
+end
 
 lemma rel_computable.comp {A₁ A₂ B} :
   rel_computable A₁ B → rel_computable A₂ B → rel_computable (A₁ ∘ A₂) B :=
@@ -880,7 +866,7 @@ begin
     intros b hb,
     use (max a b),
     intros m hm,
-    simp[hb m (lt_of_le_of_lt (le_max_right a b) hm)],
+    simp [hb m (lt_of_le_of_lt (le_max_right a b) hm)],
     apply ha m (lt_of_le_of_lt (le_max_left a b) hm)
   }
 end

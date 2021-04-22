@@ -726,63 +726,39 @@ have hp : partrec₂ p := hF.map ((sum_cases computable.id
 end partrec
 
 namespace rel_computable
+variables {α : Type*} {β : Type*} {γ : Type*} {σ : Type*} {α₁ : Type*} {α₂ : Type*} {σ₁ : Type*}
+variables [primcodable α] [primcodable β] [primcodable γ] [primcodable σ]
+variables [primcodable α₁] [primcodable α₂] [primcodable σ₁]
 
-def oracle_list : (ℕ → ℕ) → ℕ → list ℕ
-| f 0 := [f 0]
-| f (n + 1) := (oracle_list f n) ++ [f (n + 1)]
-
-def oracle_list_primcodable {α σ} [primcodable α] [primcodable σ] : (α → σ) → ℕ → list (option σ)
+def oracle_list : (α → σ) → ℕ → list (option σ)
 | f 0 := [option.map f (decode α 0)]
-| f (n + 1) := (oracle_list_primcodable f n) ++ [option.map f (decode α (n + 1))]
+| f (n + 1) := (oracle_list f n) ++ [option.map f (decode α (n + 1))]
 
-def rel_computable (A : ℕ → ℕ) (B : ℕ → ℕ) :=
-  ∃ f : list ℕ → ℕ → option ℕ, computable₂ f ∧ ∀ n, ∃ M, ∀ m > M, f (oracle_list B m) n = A n
-
-def rel_computable_primcodable {α σ β γ}
-  [primcodable α] [primcodable σ] [primcodable β] [primcodable γ]
-  (A : α → σ) (B : β → γ) :=
+def rel_computable (A : α → σ) (B : β → γ) :=
   ∃ f : list (option γ) → α → option σ, computable₂ f ∧ ∀ x, ∃ M, ∀ m > M,
-    f (oracle_list_primcodable B m) x = some (A x)
+    f (oracle_list B m) x = some (A x)
 
-lemma oracle_list_length {A : ℕ → ℕ} {n : ℕ} : (oracle_list A n).length = n + 1 :=
+lemma oracle_list_length {A : α → σ} {n : ℕ} : (oracle_list A n).length = n + 1 :=
 begin
   induction n with n ih,
   { simp [oracle_list] },
   { simp [oracle_list, ih] }
 end
 
-lemma oracle_list_length_primcodable {α σ} [primcodable α] [primcodable σ]
-  {A : α → σ} {n : ℕ} : (oracle_list_primcodable A n).length = n + 1 :=
-begin
-  induction n with n ih,
-  { simp [oracle_list_primcodable] },
-  { simp [oracle_list_primcodable, ih] }
-end
-
-lemma oracle_last_value {A : ℕ → ℕ} {n : ℕ} : (oracle_list A n).nth n = A n :=
+lemma oracle_last_value {A : α → σ} {n : ℕ} :
+  (oracle_list A n).inth n = option.map A (decode α n) :=
 begin
   cases n,
   { finish },
   {
     simp [oracle_list, nat.succ_eq_add_one],
-    simp [list.nth_append_right (eq.le oracle_list_length), oracle_list_length],
-    finish
+    simp [list.nth_append_right (eq.le oracle_list_length),
+          oracle_list_length]
   }
 end
 
-lemma oracle_last_value_primcodable {α σ} [primcodable α] [primcodable σ] {A : α → σ} {n : ℕ} :
-  (oracle_list_primcodable A n).inth n = option.map A (decode α n) :=
-begin
-  cases n,
-  { finish },
-  {
-    simp [oracle_list_primcodable, nat.succ_eq_add_one],
-    simp [list.nth_append_right (eq.le oracle_list_length_primcodable),
-          oracle_list_length_primcodable]
-  }
-end
-
-lemma oracle_list_nth {A : ℕ → ℕ} {n : ℕ} : ∀ m ≥ n, (oracle_list A m).nth n = A n :=
+lemma oracle_list_nth {A : α → σ} (n : ℕ) :
+  ∀ m ≥ n, (oracle_list A m).inth n = option.map A (decode α n) :=
 begin
   intros m h,
   induction m with m ih,
@@ -794,48 +770,18 @@ begin
     cases h with _ hnm,
     { apply oracle_last_value },
     {
-      rw [oracle_list, list.nth_append, ih hnm],
-      rwa [oracle_list_length, nat.lt_succ_iff]
-    }
-  }
-end
-
-lemma oracle_list_nth_primcodable {α σ} [primcodable α] [primcodable σ] {A : α → σ} (n : ℕ) :
-  ∀ m ≥ n, (oracle_list_primcodable A m).inth n = option.map A (decode α n) :=
-begin
-  intros m h,
-  induction m with m ih,
-  {
-    cases h,
-    finish
-  },
-  {
-    cases h with _ hnm,
-    { apply oracle_last_value_primcodable },
-    {
-      have hnlen : n < (oracle_list_primcodable A m).length :=
+      have hnlen : n < (oracle_list A m).length :=
       begin
-        simp [oracle_list_length_primcodable],
+        simp [oracle_list_length],
         apply nat.lt_succ_iff.mpr hnm
       end,
-      simp [oracle_list_primcodable, list.nth_append hnlen],
+      simp [oracle_list, list.nth_append hnlen],
       apply ih hnm
     }
   }
 end
 
-lemma rel_computable.refl {A} : rel_computable A A :=
-begin
-  use (λ (l : list ℕ) (n : ℕ), l.nth n),
-  apply and.intro computable.list_nth,
-  intro n,
-  use n,
-  intros m h,
-  apply oracle_list_nth m (nat.le_of_lt h)
-end
-
-lemma rel_computable.refl_primcodable {α σ} [primcodable α] [primcodable σ] {A : α → σ} :
-  rel_computable_primcodable A A :=
+lemma rel_computable.refl {A : α → σ} : rel_computable A A :=
 begin
   use (λ (l : list (option σ)) (a : α), l.inth (encode a)),
   apply and.intro,
@@ -847,12 +793,12 @@ begin
     intro x,
     use (encode x),
     intros m h,
-    simp [oracle_list_nth_primcodable (encode x) m (nat.le_of_lt h)],
+    simp [oracle_list_nth (encode x) m (nat.le_of_lt h)],
   }
 end
 
-lemma rel_computable.comp {A₁ A₂ B} :
-  rel_computable A₁ B → rel_computable A₂ B → rel_computable (A₁ ∘ A₂) B :=
+lemma rel_computable.comp {A₁ : α₁ → σ₁} {A₂: α₂ → α₁} {B : β → γ} :
+    rel_computable A₁ B → rel_computable A₂ B → rel_computable (A₁ ∘ A₂) B :=
 begin
   rintros ⟨f1, hf1comp, hf1⟩ ⟨f2, hf2comp, hf2⟩,
   use (λ l n, (f2 l n).bind (λ m, f1 l m)),
@@ -864,10 +810,10 @@ begin
     { apply primrec.to_comp primrec.snd }
   },
   {
-    intro n,
-    apply exists.elim (hf1 (A₂ n)),
+    intro x,
+    apply exists.elim (hf1 (A₂ x)),
     intros a ha,
-    apply exists.elim (hf2 n),
+    apply exists.elim (hf2 x),
     intros b hb,
     use (max a b),
     intros m hm,
@@ -876,10 +822,10 @@ begin
   }
 end
 
-lemma computable.to_rel_computable {f B} : computable f → rel_computable f B :=
+lemma computable.to_rel_computable {f : α → σ} {B : β → γ} : computable f → rel_computable f B :=
 begin
   intro hf,
-  use (λ (l : list ℕ) (n : ℕ), option.some (f n)),
+  use (λ (l : list (option γ)) (a : α), option.some (f a)),
   apply and.intro,
   {
     apply computable.comp₂ computable.option_some,
@@ -887,7 +833,7 @@ begin
     apply primrec.to_comp primrec.snd
   },
   {
-    intro n,
+    intro x,
     use 0,
     intros m hm,
     finish

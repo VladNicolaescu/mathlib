@@ -798,7 +798,7 @@ begin
 end
 
 lemma rel_computable.comp {A₁ : α₁ → σ₁} {A₂: α₂ → α₁} {B : β → γ} :
-    rel_computable A₁ B → rel_computable A₂ B → rel_computable (A₁ ∘ A₂) B :=
+  rel_computable A₁ B → rel_computable A₂ B → rel_computable (A₁ ∘ A₂) B :=
 begin
   rintros ⟨f1, hf1comp, hf1⟩ ⟨f2, hf2comp, hf2⟩,
   use (λ l n, (f2 l n).bind (λ m, f1 l m)),
@@ -840,9 +840,76 @@ begin
   }
 end
 
-/-theorem rel_computable.nat_strong_rec (f : ℕ → ℕ → ℕ) (g : ℕ × list ℕ → option ℕ) :
-    rel_computable g B →
-    (∀ a n, g (a, list.map (f a) (list.range n)) = some (f a n)) →
-    rel_computable f B-/
+def option_pair : option α → option β → option (α × β)
+| none _ := none
+| _ none := none
+| (some a) (some b) := some ((a, b))
+
+lemma rel_computable.pair {A₁ : α → σ} {A₂ : α → σ₁} {B : β → γ} :
+  rel_computable A₁ B → rel_computable A₂ B → rel_computable (λ a, (A₁ a, A₂ a)) B :=
+begin
+  rintros ⟨f1, hf1comp, hf1⟩ ⟨f2, hf2comp, hf2⟩,
+  use (λ (l : list (option γ)) (a : α), option_pair (f1 l a) (f2 l a)),
+  apply and.intro,
+  {
+    apply computable₂.comp₂ _ hf1comp hf2comp,
+    sorry
+  },
+  {
+    intro x,
+    apply exists.elim (hf1 x),
+    intros a ha,
+    apply exists.elim (hf2 x),
+    intros b hb,
+    use (max a b),
+    intros m hm,
+    simp [hb m (lt_of_le_of_lt (le_max_right a b) hm)],
+    simp [ha m (lt_of_le_of_lt (le_max_left a b) hm)],
+    simp [option_pair]
+  }
+end
+
+theorem rel_computable.nat_strong_rec (f : α → ℕ → σ) (g : α × list σ → option σ) (B : β → γ)
+  (hg : rel_computable g B)
+  (H : ∀ p : α × ℕ, g (p.1, ((list.range p.2).map (f p.1))) = some (f p.1 p.2)) :
+  rel_computable (λ p : α × ℕ, f p.1 p.2) B :=
+begin
+  have hrange : rel_computable (λ p : α × ℕ, (list.range p.2).map (f p.1)) B :=
+  begin
+    use (λ (l : list (option γ)) (p : α × ℕ), some ((list.range p.2).map (f p.1))),
+    apply and.intro,
+    {
+      apply computable.comp₂ computable.option_some,
+      {
+        sorry
+      }
+    },
+    {
+      intro x,
+      use 0,
+      intros m hm,
+      refl
+    }
+  end,
+  have hcomp : rel_computable (λ p : α × ℕ, g (p.1, ((list.range p.2).map (f p.1)))) B :=
+  begin
+    apply rel_computable.comp hg,
+    apply rel_computable.pair (computable.to_rel_computable computable.fst) hrange
+  end,
+  apply exists.elim hcomp,
+  intros G HG,
+  use (λ (l : list (option γ)) (p : α × ℕ), option.bind (G l p) id),
+  apply and.intro,
+  { apply computable.option_bind (and.elim_left HG) (primrec₂.to_comp primrec₂.right) },
+  {
+    intro x,
+    apply exists.elim (and.elim_right HG x),
+    intros M hM,
+    use M,
+    intros m hm,
+    simp [hM m hm],
+    apply H
+  }
+end
 
 end rel_computable

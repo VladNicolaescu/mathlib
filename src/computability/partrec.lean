@@ -840,10 +840,8 @@ begin
   }
 end
 
-def option_pair : option α → option β → option (α × β)
-| none _ := none
-| _ none := none
-| (some a) (some b) := some ((a, b))
+def option_pair (a : option α) (b : option β) : option (α × β) :=
+  a.bind $ λ a, b.map $ λ b, (a, b)
 
 lemma rel_computable.pair {A₁ : α → σ} {A₂ : α → σ₁} {B : β → γ} :
   rel_computable A₁ B → rel_computable A₂ B → rel_computable (λ a, (A₁ a, A₂ a)) B :=
@@ -853,7 +851,9 @@ begin
   apply and.intro,
   {
     apply computable₂.comp₂ _ hf1comp hf2comp,
-    sorry
+    apply computable.option_bind computable.fst,
+    apply computable.option_map (computable.comp computable.snd computable.fst),
+    apply computable.pair (computable.comp computable.snd computable.fst) computable.snd
   },
   {
     intro x,
@@ -880,9 +880,7 @@ begin
     apply and.intro,
     {
       apply computable.comp₂ computable.option_some,
-      {
-        sorry
-      }
+      sorry
     },
     {
       intro x,

@@ -811,10 +811,8 @@ begin
   },
   {
     intro x,
-    apply exists.elim (hf1 (A₂ x)),
-    intros a ha,
-    apply exists.elim (hf2 x),
-    intros b hb,
+    choose a ha using hf1 (A₂ x),
+    choose b hb using hf2 x,
     use (max a b),
     intros m hm,
     simp [hb m (lt_of_le_of_lt (le_max_right a b) hm)],
@@ -857,15 +855,51 @@ begin
   },
   {
     intro x,
-    apply exists.elim (hf1 x),
-    intros a ha,
-    apply exists.elim (hf2 x),
-    intros b hb,
+    choose a ha using hf1 x,
+    choose b hb using hf2 x,
     use (max a b),
     intros m hm,
     simp [hb m (lt_of_le_of_lt (le_max_right a b) hm)],
     simp [ha m (lt_of_le_of_lt (le_max_left a b) hm)],
     simp [option_pair]
+  }
+end
+
+theorem rel_computable.nat_elim
+  {f : α → ℕ} {g : α → σ} {h : α × ℕ × option σ → σ} {B : β → γ}
+  (hf : rel_computable f B) (hg : rel_computable g B) (hh : rel_computable h B) :
+  rel_computable (λ a, (f a).elim (g a) (λ y IH, h (a, y, IH))) B :=
+begin
+  choose F HF using hf,
+  choose G HG using hg,
+  choose H HH using hh,
+  use (λ (l : list (option γ)) (a : α),
+      nat.elim (G l a) (λ (y : ℕ) (IH : option σ), H l (a, y, IH)) (option.get_or_else (F l a) 0)),
+  apply and.intro,
+  {
+    sorry
+  },
+  {
+    intro a,
+    choose nf hnf using and.elim_right HF a,
+    choose ng hng using and.elim_right HG a,
+    use (max nf ng),
+    intros m hm,
+    simp[hng m (lt_of_le_of_lt (le_max_right nf ng) hm)],
+    simp[hnf m (lt_of_le_of_lt (le_max_left nf ng) hm)],
+    have heq : nat.elim (option.some (g a)) (λ (y : ℕ) (IH : option σ), h (a, y, IH)) (f a) =
+                    some (nat.elim (g a) (λ (y : ℕ) (IH : σ), h (a, y, ↑IH)) (f a)) :=
+    begin
+      sorry
+    end,
+    apply eq.trans _ heq,
+    congr,
+    apply funext,
+    intro y,
+    apply funext,
+    intro IH,
+    choose nh hnh using and.elim_right HH (a, y, IH),
+    sorry
   }
 end
 
@@ -894,15 +928,13 @@ begin
     apply rel_computable.comp hg,
     apply rel_computable.pair (computable.to_rel_computable computable.fst) hrange
   end,
-  apply exists.elim hcomp,
-  intros G HG,
+  choose G HG using hcomp,
   use (λ (l : list (option γ)) (p : α × ℕ), option.bind (G l p) id),
   apply and.intro,
   { apply computable.option_bind (and.elim_left HG) (primrec₂.to_comp primrec₂.right) },
   {
     intro x,
-    apply exists.elim (and.elim_right HG x),
-    intros M hM,
+    choose M hM using and.elim_right HG x,
     use M,
     intros m hm,
     simp [hM m hm],

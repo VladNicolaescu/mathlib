@@ -738,6 +738,8 @@ def rel_computable (A : α → σ) (B : β → γ) :=
   ∃ f : list (option γ) → α → option σ, computable₂ f ∧ ∀ x, ∃ M, ∀ m > M,
     f (oracle_list B m) x = some (A x)
 
+def rel_computable₂ (A : α₁ → α₂ → σ) (B : β → γ) := rel_computable (λ p : α₁ × α₂, A p.1 p.2) B
+
 lemma oracle_list_length {A : α → σ} {n : ℕ} : (oracle_list A n).length = n + 1 :=
 begin
   induction n with n ih,
@@ -865,10 +867,47 @@ begin
   }
 end
 
+theorem rel_computable₂.comp {f : option α₁ → option α₂ → σ} {g : α → α₁} {h : α → α₂}
+  {B : β → γ} (hf : rel_computable₂ f B) (hg : rel_computable g B) (hh : rel_computable h B) :
+  rel_computable (λ a, f (g a) (h a)) B :=
+begin
+  choose F HF using hf,
+  choose G HG using hg,
+  choose H HH using hh,
+  use (λ (l : list (option γ)) (a : α), F l ((G l a), (H l a))),
+  apply and.intro,
+  {
+    apply computable₂.comp₂ (and.elim_left HF) (primrec₂.to_comp primrec₂.left),
+    apply computable.to₂ (computable.pair (and.elim_left HG) (and.elim_left HH))
+  },
+  {
+    intro a,
+    choose nf hnf using HF.2,
+    choose ng hng using and.elim_right HG a,
+    choose nh hnh using and.elim_right HH a,
+    let M := max (ng + 1) (nh + 1),
+    use max M (nf (G (oracle_list B (ng + 1)) a, H (oracle_list B (nh + 1)) a)),
+    intros m hm,
+    simp[
+      hng m
+        (lt_of_le_of_lt (nat.le_succ ng)
+        (lt_of_le_of_lt (le_max_left (ng + 1) (nh + 1)) (lt_of_le_of_lt (le_max_left M _) hm)))
+    ],
+    simp[
+      hnh m
+        (lt_of_le_of_lt (nat.le_succ nh)
+        (lt_of_le_of_lt (le_max_right (ng + 1) (nh + 1)) (lt_of_le_of_lt (le_max_left M _) hm)))
+    ],
+    apply hnf (some (g a), some (h a)),
+    simp[hng (ng + 1) (lt_add_one ng), hnh (nh + 1) (lt_add_one nh)] at hm,
+    apply and.elim_right hm
+  }
+end
+
 theorem rel_computable.nat_elim
-  {f : α → ℕ} {g : α → σ} {h : α × ℕ × option σ → σ} {B : β → γ}
-  (hf : rel_computable f B) (hg : rel_computable g B) (hh : rel_computable h B) :
-  rel_computable (λ a, (f a).elim (g a) (λ y IH, h (a, y, IH))) B :=
+  {f : α → ℕ} {g : α → σ} {h : α → ℕ × option σ → σ} {B : β → γ}
+  (hf : rel_computable f B) (hg : rel_computable g B) (hh : rel_computable₂ h B) :
+  rel_computable (λ a, (f a).elim (g a) (λ y IH, h a (y, IH))) B :=
 begin
   choose F HF using hf,
   choose G HG using hg,
@@ -887,8 +926,8 @@ begin
     intros m hm,
     simp[hng m (lt_of_le_of_lt (le_max_right nf ng) hm)],
     simp[hnf m (lt_of_le_of_lt (le_max_left nf ng) hm)],
-    have heq : nat.elim (option.some (g a)) (λ (y : ℕ) (IH : option σ), h (a, y, IH)) (f a) =
-                    some (nat.elim (g a) (λ (y : ℕ) (IH : σ), h (a, y, ↑IH)) (f a)) :=
+    have heq : nat.elim (option.some (g a)) (λ (y : ℕ) (IH : option σ), h a (y, IH)) (f a) =
+                    some (nat.elim (g a) (λ (y : ℕ) (IH : σ), h a (y, ↑IH)) (f a)) :=
     begin
       sorry
     end,

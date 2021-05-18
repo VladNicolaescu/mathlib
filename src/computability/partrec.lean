@@ -536,6 +536,14 @@ theorem nat_elim
 (partrec.nat_elim hf hg hh.part).of_eq $
 λ a, by simp; induction f a; simp *
 
+theorem nat_elim'
+    {f : α → ℕ} {g : α → σ} {h : α → ℕ → σ → σ}
+    (hf : computable f) (hg : computable g)
+    (hh : computable₂ (λ a (p : ℕ × σ), h a p.1 p.2)) :
+    computable (λ a, (f a).elim (g a) (λ y IH, h a y IH)) :=
+(partrec.nat_elim hf hg hh.part).of_eq $
+λ a, by simp; induction f a; simp *
+
 theorem nat_cases {f : α → ℕ} {g : α → σ} {h : α → ℕ → σ}
   (hf : computable f) (hg : computable g) (hh : computable₂ h) :
   computable (λ a, (f a).cases (g a) (h a)) :=
@@ -916,16 +924,53 @@ begin
       nat.elim (G l a) (λ (y : ℕ) (IH : option σ), H l (a, y, IH)) (option.get_or_else (F l a) 0)),
   apply and.intro,
   {
-    sorry
+    apply computable.nat_elim' _ (and.elim_left HG) _,
+    { apply computable.option_get_or_else (and.elim_left HF) (computable.const 0) },
+    {
+      apply computable₂.comp₂ (and.elim_left HH),
+      { apply computable.comp₂ computable.fst (primrec₂.to_comp primrec₂.left) },
+      {
+        apply computable₂.comp₂ (primrec₂.to_comp primrec₂.pair),
+        { apply computable.comp₂ computable.snd (primrec₂.to_comp primrec₂.left) },
+        {
+          apply computable₂.comp₂ (primrec₂.to_comp primrec₂.pair),
+          { apply computable.comp₂ computable.fst (primrec₂.to_comp primrec₂.right) },
+          { apply computable.comp₂ computable.snd (primrec₂.to_comp primrec₂.right) }
+        }
+      }
+    }
   },
   {
     intro a,
     choose nf hnf using and.elim_right HF a,
     choose ng hng using and.elim_right HG a,
-    use (max nf ng),
+    choose nh hnh using HH.2,
+    let M := nat.elim (max nf ng) (λ y, max (nh (a, y, y.elim (g a) (λ y IH, h a (y, IH))))),
+    use M (f a),
     intros m hm,
-    simp[hng m (lt_of_le_of_lt (le_max_right nf ng) hm)],
-    simp[hnf m (lt_of_le_of_lt (le_max_left nf ng) hm)],
+    have hmnf : m > nf :=
+    begin
+      apply lt_of_le_of_lt _ hm,
+      apply le_trans (le_max_left nf ng),
+      induction (f a),
+      { apply le_refl },
+      {
+        apply le_trans ih,
+        apply le_max_right
+      }
+    end,
+    have hmng : m > ng :=
+    begin
+      apply lt_of_le_of_lt _ hm,
+      apply le_trans (le_max_right nf ng),
+      induction (f a),
+      { apply le_refl },
+      {
+        apply le_trans ih,
+        apply le_max_right
+      }
+    end,
+    simp[hnf m hmnf, hng m hmng],
     have heq : nat.elim (option.some (g a)) (λ (y : ℕ) (IH : option σ), h a (y, IH)) (f a) =
                     some (nat.elim (g a) (λ (y : ℕ) (IH : σ), h a (y, ↑IH)) (f a)) :=
     begin
@@ -937,8 +982,20 @@ begin
     intro y,
     apply funext,
     intro IH,
-    choose nh hnh using and.elim_right HH (a, y, IH),
-    sorry
+    apply hnh (a, y, IH),
+    have hM : nh (a, y, IH) ≤ M (f a) :=
+    begin
+      induction (f a),
+      {
+        simp[M],
+        sorry
+      },
+      {
+        apply le_trans ih,
+        apply le_max_right
+      }
+    end,
+    apply lt_of_le_of_lt hM hm
   }
 end
 

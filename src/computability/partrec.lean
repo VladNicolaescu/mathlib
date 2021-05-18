@@ -974,7 +974,12 @@ begin
     have heq : nat.elim (option.some (g a)) (λ (y : ℕ) (IH : option σ), h a (y, IH)) (f a) =
                     some (nat.elim (g a) (λ (y : ℕ) (IH : σ), h a (y, ↑IH)) (f a)) :=
     begin
-      sorry
+      induction (f a),
+      { refl },
+      {
+        simp[ih],
+        refl
+      }
     end,
     apply eq.trans _ heq,
     congr,
@@ -987,7 +992,6 @@ begin
     begin
       induction (f a),
       {
-        simp[M],
         sorry
       },
       {

@@ -982,24 +982,22 @@ begin
       }
     end,
     apply eq.trans _ heq,
-    congr,
-    apply funext,
-    intro y,
-    apply funext,
-    intro IH,
-    apply hnh (a, y, IH),
-    have hM : nh (a, y, IH) ≤ M (f a) :=
-    begin
-      induction (f a),
-      {
-        sorry
-      },
-      {
-        apply le_trans ih,
+    revert hm,
+    induction (f a); intro hm,
+    { refl },
+    {
+      have hmM : m > M n :=
+      begin
+        apply lt_of_le_of_lt _ hm,
         apply le_max_right
-      }
-    end,
-    apply lt_of_le_of_lt hM hm
+      end,
+      simp[ih hmM],
+      apply hnh,
+      apply lt_of_le_of_lt _ hm,
+      simp[M],
+      apply or.intro_left,
+      refl
+    }
   }
 end
 

@@ -875,42 +875,17 @@ begin
   }
 end
 
-theorem rel_computable₂.comp {f : option α₁ → option α₂ → σ} {g : α → α₁} {h : α → α₂}
-  {B : β → γ} (hf : rel_computable₂ f B) (hg : rel_computable g B) (hh : rel_computable h B) :
-  rel_computable (λ a, f (g a) (h a)) B :=
-begin
-  choose F HF using hf,
-  choose G HG using hg,
-  choose H HH using hh,
-  use (λ (l : list (option γ)) (a : α), F l ((G l a), (H l a))),
-  apply and.intro,
-  {
-    apply computable₂.comp₂ (and.elim_left HF) (primrec₂.to_comp primrec₂.left),
-    apply computable.to₂ (computable.pair (and.elim_left HG) (and.elim_left HH))
-  },
-  {
-    intro a,
-    choose nf hnf using HF.2,
-    choose ng hng using and.elim_right HG a,
-    choose nh hnh using and.elim_right HH a,
-    let M := max (ng + 1) (nh + 1),
-    use max M (nf (G (oracle_list B (ng + 1)) a, H (oracle_list B (nh + 1)) a)),
-    intros m hm,
-    simp[
-      hng m
-        (lt_of_le_of_lt (nat.le_succ ng)
-        (lt_of_le_of_lt (le_max_left (ng + 1) (nh + 1)) (lt_of_le_of_lt (le_max_left M _) hm)))
-    ],
-    simp[
-      hnh m
-        (lt_of_le_of_lt (nat.le_succ nh)
-        (lt_of_le_of_lt (le_max_right (ng + 1) (nh + 1)) (lt_of_le_of_lt (le_max_left M _) hm)))
-    ],
-    apply hnf (some (g a), some (h a)),
-    simp[hng (ng + 1) (lt_add_one ng), hnh (nh + 1) (lt_add_one nh)] at hm,
-    apply and.elim_right hm
-  }
-end
+theorem rel_computable.comp₂ {f : α → σ} {g : α₁ → α₂ → α} {B : β → γ}
+  (hf : rel_computable f B) (hg : rel_computable₂ g B) :
+  rel_computable₂ (λ a b, f (g a b)) B := rel_computable.comp hf hg
+
+theorem rel_computable₂.comp {f : α₁ → α₂ → σ} {g : α → α₁} {h : α → α₂} {B : β → γ}
+  (hf : rel_computable₂ f B) (hg : rel_computable g B) (hh : rel_computable h B) :
+  rel_computable (λ a, f (g a) (h a)) B := rel_computable.comp hf (hg.pair hh)
+
+theorem rel_computable₂.comp₂ {f : σ → σ₁ → α} {g : α₁ → α₂ → σ} {h : α₁ → α₂ → σ₁} {B : β → γ}
+  (hf : rel_computable₂ f B) (hg : rel_computable₂ g B) (hh : rel_computable₂ h B) :
+  rel_computable₂ (λ a b, f (g a b) (h a b)) B := by apply rel_computable₂.comp hf hg hh
 
 theorem rel_computable.nat_elim
   {f : α → ℕ} {g : α → σ} {h : α → ℕ × option σ → σ} {B : β → γ}
@@ -1001,30 +976,19 @@ begin
   }
 end
 
-theorem rel_computable.nat_strong_rec (f : α → ℕ → σ) (g : α × list σ → option σ) (B : β → γ)
-  (hg : rel_computable g B)
-  (H : ∀ p : α × ℕ, g (p.1, ((list.range p.2).map (f p.1))) = some (f p.1 p.2)) :
-  rel_computable (λ p : α × ℕ, f p.1 p.2) B :=
+theorem rel_computable.nat_strong_rec (f : α → ℕ → σ) (g : α → list σ → option σ) (B : β → γ)
+  (hg : rel_computable₂ g B) (H : ∀ a n, g a ((list.range n).map (f a)) = some (f a n)) :
+  rel_computable₂ f B :=
 begin
-  have hrange : rel_computable (λ p : α × ℕ, (list.range p.2).map (f p.1)) B :=
+  have hrange : rel_computable₂ (λ a n, (list.range n).map (f a)) B :=
   begin
-    use (λ (l : list (option γ)) (p : α × ℕ), some ((list.range p.2).map (f p.1))),
-    apply and.intro,
-    {
-      apply computable.comp₂ computable.option_some,
-      sorry
-    },
-    {
-      intro x,
-      use 0,
-      intros m hm,
-      refl
-    }
+    sorry
   end,
-  have hcomp : rel_computable (λ p : α × ℕ, g (p.1, ((list.range p.2).map (f p.1)))) B :=
+  have hcomp : rel_computable₂ (λ a n, g a ((list.range n).map (f a))) B :=
   begin
-    apply rel_computable.comp hg,
-    apply rel_computable.pair (computable.to_rel_computable computable.fst) hrange
+    apply rel_computable₂.comp₂ hg,
+    { apply computable.to_rel_computable computable.fst },
+    { apply hrange }
   end,
   choose G HG using hcomp,
   use (λ (l : list (option γ)) (p : α × ℕ), option.bind (G l p) id),

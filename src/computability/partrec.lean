@@ -1182,8 +1182,11 @@ begin
     intro a,
     choose nf hnf using and.elim_right HF a,
     choose ng hng using HG.2,
-    cases (f a),
+    /-cases (f a),
     {
+      use nf,
+      intros m hm,
+      simp [hnf m hm],
       sorry
     },
     {
@@ -1192,8 +1195,8 @@ begin
       simp [hnf m (lt_of_le_of_lt (le_max_left nf _) hm)],
       simp [hng (a, val) m (lt_of_le_of_lt (le_max_right nf (ng (a, val))) hm)],
       sorry
-    }
-    /-let M := option.get_or_else ((λ (o : option σ),
+    }-/
+    let M := option.get_or_else ((λ (o : option σ),
       option.bind o (λ (s : σ), some (ng (a, s)))) (f a)) 0,
     use max nf M,
     intros m hm,
@@ -1207,7 +1210,7 @@ begin
         sorry
       end,
       simp [hng (a, val) m hmval]
-    }-/
+    }
   }
 end
 

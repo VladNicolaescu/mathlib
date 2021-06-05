@@ -899,7 +899,7 @@ begin
       choose M hM using and.elim_right H a,
       use M,
       intros m hm,
-      simp[hM m hm]
+      simp [hM m hm]
     }
   },
   {
@@ -911,7 +911,7 @@ begin
       choose M hM using and.elim_right H a,
       use M,
       intros m hm,
-      simp[hM m hm]
+      simp [hM m hm]
     }
   }
 end
@@ -937,7 +937,7 @@ theorem rel_computable.option_some {B : β → γ} : rel_computable (@option.som
 theorem rel_computable.to₂ {f : α₁ × α₂ → σ} {B : β → γ} (hf : rel_computable f B) :
   rel_computable₂ (λ a b, f (a, b)) B :=
 begin
-  simp[rel_computable₂, hf]
+  simp [rel_computable₂, hf]
 end
 
 theorem rel_computable.encode_iff {f : α → σ} {B : β → γ} :
@@ -1004,14 +1004,14 @@ begin
         apply le_max_right
       }
     end,
-    simp[hnf m hmnf, hng m hmng],
+    simp [hnf m hmnf, hng m hmng],
     have heq : nat.elim (option.some (g a)) (λ (y : ℕ) (IH : option σ), h a (y, IH)) (f a) =
                     some (nat.elim (g a) (λ (y : ℕ) (IH : σ), h a (y, ↑IH)) (f a)) :=
     begin
       induction (f a),
       { refl },
       {
-        simp[ih],
+        simp [ih],
         refl
       }
     end,
@@ -1025,10 +1025,10 @@ begin
         apply lt_of_le_of_lt _ hm,
         apply le_max_right
       end,
-      simp[ih hmM],
+      simp [ih hmM],
       apply hnh,
       apply lt_of_le_of_lt _ hm,
-      simp[M],
+      simp [M],
       apply or.intro_left,
       refl
     }
@@ -1043,7 +1043,7 @@ begin
   choose F HF using hf,
   choose G HG using hg,
   choose H HH using hh,
-  simp[rel_computable],
+  simp [rel_computable],
   use (λ (l : list (option γ)) (a : α), nat.elim (G l a)
     (λ (n : ℕ) (o : option σ), option.bind o (λ (s : σ), H l (a, n, s)))
     (option.get_or_else (F l a) 0)),
@@ -1108,19 +1108,7 @@ begin
         apply le_max_right
       }
     end,
-    simp[hnf m hmnf, hng m hmng],
-    have heq : nat.elim (option.some (g a))
-                (λ (y : ℕ) (IH : option σ), option.bind IH (λ (s : σ), h a y s)) (f a) =
-                    some (nat.elim (g a) (h a) (f a)) :=
-    begin
-      induction (f a),
-      { refl },
-      {
-        simp[ih],
-        refl
-      }
-    end,
-    apply eq.trans _ heq,
+    simp [hnf m hmnf, hng m hmng],
     revert hm,
     induction (f a); intro hm,
     { refl },
@@ -1130,8 +1118,12 @@ begin
         apply lt_of_le_of_lt _ hm,
         apply le_max_right
       end,
-      simp[ih hmM],
-      sorry
+      simp [ih hmM],
+      apply hnh,
+      apply lt_of_le_of_lt _ hm,
+      simp [M],
+      apply or.intro_left,
+      refl
     }
   }
 end
@@ -1172,45 +1164,50 @@ begin
   choose F HF using hf,
   choose G HG using hg,
   use (λ (l : list (option γ)) (a : α),
-    (F l a).bind (λ (x : option σ), option.bind x (λ (s : σ), G l (a, s)))),
+    some ((F l a).bind (λ (x : option σ), option.bind x (λ (s : σ), (G l (a, s)).bind id)))),
   apply and.intro,
   {
+    apply computable.comp₂ computable.option_some,
     apply computable.option_bind (and.elim_left HF),
     apply computable.option_bind (computable.snd),
-    apply computable₂.comp₂ (and.elim_left HG),
+    apply computable.option_bind _ (primrec₂.to_comp primrec₂.right),
+    apply computable₂.comp (and.elim_left HG),
+    { apply computable.comp computable.fst (computable.comp computable.fst computable.fst) },
     {
-      apply computable.comp₂ computable.fst,
-      apply computable.comp₂ computable.fst (primrec₂.to_comp primrec₂.left)
-    },
-    {
-      apply computable₂.comp₂ (primrec₂.to_comp primrec₂.pair) _ (primrec₂.to_comp primrec₂.right),
-      {
-        apply computable.comp₂ computable.snd,
-        apply computable.comp₂ computable.fst (primrec₂.to_comp primrec₂.left)
-      }
+      apply computable₂.comp (primrec₂.to_comp primrec₂.pair) _ computable.snd,
+      apply computable.comp computable.snd (computable.comp computable.fst computable.fst)
     }
   },
   {
     intro a,
     choose nf hnf using and.elim_right HF a,
     choose ng hng using HG.2,
-    let M := option.get_or_else ((λ (o : option σ),
+    cases (f a),
+    {
+      sorry
+    },
+    {
+      use max nf (ng (a, val)),
+      intros m hm,
+      simp [hnf m (lt_of_le_of_lt (le_max_left nf _) hm)],
+      simp [hng (a, val) m (lt_of_le_of_lt (le_max_right nf (ng (a, val))) hm)],
+      sorry
+    }
+    /-let M := option.get_or_else ((λ (o : option σ),
       option.bind o (λ (s : σ), some (ng (a, s)))) (f a)) 0,
     use max nf M,
     intros m hm,
-    simp[hnf m (lt_of_le_of_lt (le_max_left nf M) hm)],
+    simp [hnf m (lt_of_le_of_lt (le_max_left nf M) hm)],
     cases (f a),
-    { sorry },
+    { refl },
     {
-      use val,
-      apply and.intro,
-      { refl },
-      {
-        apply hng (a, val),
-        apply lt_of_le_of_lt _ (lt_of_le_of_lt (le_max_right nf M) hm),
+      simp [bind],
+      have hmval : m > ng (a, val) :=
+      begin
         sorry
-      }
-    }
+      end,
+      simp [hng (a, val) m hmval]
+    }-/
   }
 end
 

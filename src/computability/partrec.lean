@@ -940,12 +940,6 @@ begin
   simp [rel_computable₂, hf]
 end
 
-theorem rel_computable.encode_iff {f : α → σ} {B : β → γ} :
-  rel_computable (λ a, encode (f a)) B ↔ rel_computable f B :=
-begin
-  sorry
-end
-
 theorem rel_computable.nat_elim
   {f : α → ℕ} {g : α → σ} {h : α → ℕ × option σ → σ} {B : β → γ}
   (hf : rel_computable f B) (hg : rel_computable g B) (hh : rel_computable₂ h B) :
@@ -1128,37 +1122,7 @@ begin
   }
 end
 
-theorem rel_computable.bind_decode_iff {f : α₁ → α₂ → option σ} {B : β → γ} :
-  rel_computable₂ (λ a n, (decode α₂ n).bind (f a)) B ↔ rel_computable₂ f B :=
-begin
-  sorry
-end
-
-theorem rel_computable.map_decode_iff {f : α₁ → α₂ → σ} {B : β → γ} : rel_computable₂ (λ a n,
-  (decode α₂ n).map (f a)) B ↔ rel_computable₂ f B :=
-rel_computable.bind_decode_iff.trans rel_computable.option_some_iff
-
-theorem rel_computable.nat_cases {f : α → ℕ} {g : α → σ} {h : α → ℕ → σ} {B : β → γ}
-  (hf : rel_computable f B) (hg : rel_computable g B) (hh : rel_computable₂ h B) :
-  rel_computable (λ a, (f a).cases (g a) (h a)) B :=
-rel_computable.nat_elim' hf hg
-  (hh.comp rel_computable.fst $ rel_computable.fst.comp rel_computable.snd).to₂
-
-theorem rel_computable.option_cases {o : α → option σ} {f : α → σ₁} {g : α → σ → σ₁} {B : β → γ}
-  (ho : rel_computable o B) (hf : rel_computable f B) (hg : rel_computable₂ g B) :
-  @rel_computable _ _ _ σ₁ _ _ _ _ (λ a, option.cases_on (o a) (f a) (g a)) B :=
-rel_computable.option_some_iff.1 $
-(rel_computable.nat_cases (rel_computable.encode_iff.2 ho) (rel_computable.option_some_iff.2 hf)
-    (rel_computable.map_decode_iff.2 hg)).of_eq $
-λ a, by cases o a; simp [encodek]; refl
-
--- TODO: check if there is an easier way to prove option_bind, without using option_cases
 theorem rel_computable.option_bind {f : α → option σ} {g : α → σ → option σ₁} {B : β → γ}
-  (hf : rel_computable f B) (hg : rel_computable₂ g B) : rel_computable (λ a, (f a).bind (g a)) B :=
-(rel_computable.option_cases hf (rel_computable.const option.none) hg).of_eq $
-λ a, by cases f a; refl
-
-theorem rel_computable.option_bind2 {f : α → option σ} {g : α → σ → option σ₁} {B : β → γ}
   (hf : rel_computable f B) (hg : rel_computable₂ g B) : rel_computable (λ a, (f a).bind (g a)) B :=
 begin
   choose F HF using hf,
@@ -1182,35 +1146,15 @@ begin
     intro a,
     choose nf hnf using and.elim_right HF a,
     choose ng hng using HG.2,
-    /-cases (f a),
-    {
-      use nf,
-      intros m hm,
-      simp [hnf m hm],
-      sorry
-    },
-    {
-      use max nf (ng (a, val)),
-      intros m hm,
-      simp [hnf m (lt_of_le_of_lt (le_max_left nf _) hm)],
-      simp [hng (a, val) m (lt_of_le_of_lt (le_max_right nf (ng (a, val))) hm)],
-      sorry
-    }-/
     let M := option.get_or_else ((λ (o : option σ),
       option.bind o (λ (s : σ), some (ng (a, s)))) (f a)) 0,
     use max nf M,
     intros m hm,
     simp [hnf m (lt_of_le_of_lt (le_max_left nf M) hm)],
-    cases (f a),
+    revert M,
+    cases (f a); intros M hm,
     { refl },
-    {
-      simp [bind],
-      have hmval : m > ng (a, val) :=
-      begin
-        sorry
-      end,
-      simp [hng (a, val) m hmval]
-    }
+    { simp [hng (a, val) m (lt_of_le_of_lt (le_max_right _ M) hm)] }
   }
 end
 

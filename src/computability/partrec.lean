@@ -806,6 +806,35 @@ begin
   }
 end
 
+lemma rel_computable.trans {A : α → σ} {B : α → σ} {C : α → σ}
+  (hAB : rel_computable A B) (hBC : rel_computable B C) : rel_computable A C :=
+begin
+  choose f hf using hAB,
+  choose g hg using hBC,
+  use (λ (l : list (option σ)) (a : α),
+    f (list.map (λ (o : option (option σ)), o.bind id) (oracle_list (g l) (l.length - 1))) a),
+  apply and.intro,
+  {
+    sorry
+  },
+  {
+    intro a,
+    choose Mf hF using (and.elim_right hf a),
+    choose Mg hG using hg.2,
+    -- TODO: choose appropriate witness
+    use Mf,
+    intros m hm,
+    have h : list.map (λ (o : option (option σ)), o.bind id)
+      (oracle_list (g (oracle_list C m)) ((oracle_list C m).length - 1)) = oracle_list B m :=
+    begin
+      simp[oracle_list_length],
+      sorry
+    end,
+    simp[h],
+    apply hF m hm
+  }
+end
+
 lemma computable.to_rel_computable {f : α → σ} {B : β → γ} : computable f → rel_computable f B :=
 begin
   intro hf,
@@ -1214,3 +1243,26 @@ begin
     apply H
   }
 end
+
+@[instance] def turing_eqv : setoid (α → σ) :=
+{
+  r := λ A B, rel_computable A B ∧ rel_computable B A,
+  iseqv :=
+    begin
+      repeat { apply and.intro },
+      {
+        intro A,
+        apply and.intro rel_computable.refl rel_computable.refl
+      },
+      {
+        intros A B h,
+        apply and.intro (and.elim_right h) (and.elim_left h)
+      },
+      {
+        intros A B C hAB hBC,
+        apply and.intro,
+        { apply rel_computable.trans (and.elim_left hAB) (and.elim_left hBC) },
+        { apply rel_computable.trans (and.elim_right hBC) (and.elim_right hAB) }
+      }
+    end
+}

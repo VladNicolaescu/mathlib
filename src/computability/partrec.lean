@@ -743,7 +743,7 @@ def oracle_list : (α → σ) → ℕ → list (option σ)
 
 def rel_computable (A : α → σ) (B : β → γ) :=
   ∃ f : list (option γ) → α → option σ, computable₂ f ∧ ∀ x, ∃ M, ∀ m > M,
-    f (oracle_list B m) x = some (A x)
+    ∀ ys : list (option γ), (∀ i < m, ys.nth i = (oracle_list B m).nth i) → f ys x = some (A x)
 
 def rel_computable₂ (A : α₁ → α₂ → σ) (B : β → γ) := rel_computable (λ p : α₁ × α₂, A p.1 p.2) B
 
@@ -801,18 +801,24 @@ begin
   {
     intro x,
     use (encode x),
-    intros m h,
-    simp [oracle_list_nth (encode x) m (nat.le_of_lt h)],
+    intros m hm ys hys,
+    simp [hys (encode x) hm],
+    have h : ((oracle_list A m).nth (encode x)).iget = (oracle_list A m).inth (encode x) :=
+    begin
+      simp [list.inth]
+    end,
+    apply eq.trans h,
+    simp [oracle_list_nth (encode x) m (nat.le_of_lt hm)]
   }
 end
 
-lemma rel_computable.trans {A : α → σ} {B : α → σ} {C : α → σ}
+lemma rel_computable.trans {A : α → σ} {B : α₁ → σ₁} {C : β → γ}
   (hAB : rel_computable A B) (hBC : rel_computable B C) : rel_computable A C :=
 begin
   choose f hf using hAB,
   choose g hg using hBC,
-  use (λ (l : list (option σ)) (a : α),
-    f (list.map (λ (o : option (option σ)), o.bind id) (oracle_list (g l) (l.length - 1))) a),
+  use (λ (l : list (option γ)) (a : α),
+    f (list.map (λ (o : option (option σ₁)), o.bind id) (oracle_list (g l) (l.length - 1))) a),
   apply and.intro,
   {
     sorry
@@ -823,15 +829,29 @@ begin
     choose Mg hG using hg.2,
     -- TODO: choose appropriate witness
     use Mf,
-    intros m hm,
-    have h : list.map (λ (o : option (option σ)), o.bind id)
-      (oracle_list (g (oracle_list C m)) ((oracle_list C m).length - 1)) = oracle_list B m :=
+    intros m hm ys hys,
+    apply hF m hm,
+    intros i hi,
+    have h : list.map (λ (o : option (option σ₁)), o.bind id)
+      (oracle_list (g ys) i) = oracle_list B i :=
     begin
-      simp[oracle_list_length],
-      sorry
+      induction i with iN ih,
+      {
+        simp [oracle_list],
+        cases (decode α₁ 0),
+        { refl },
+        {
+          simp,
+          sorry
+        }
+      },
+      {
+        simp [oracle_list],
+        simp [ih (lt_trans (lt_add_one iN) hi)],
+        sorry
+      }
     end,
-    simp[h],
-    apply hF m hm
+    sorry
   }
 end
 
@@ -873,10 +893,19 @@ begin
     choose a ha using hf1 x,
     choose b hb using hf2 x,
     use (max a b),
-    intros m hm,
-    simp [hb m (lt_of_le_of_lt (le_max_right a b) hm)],
-    simp [ha m (lt_of_le_of_lt (le_max_left a b) hm)],
-    simp [option_pair]
+    intros m hm ys hys,
+    simp [option_pair],
+    apply and.intro,
+    {
+      apply ha m (lt_of_le_of_lt (le_max_left a b) hm) ys,
+      intros i hi,
+      apply hys i hi
+    },
+    {
+      apply hb m (lt_of_le_of_lt (le_max_right a b) hm) ys,
+      intros i hi,
+      apply hys i hi
+    }
   }
 end
 
@@ -897,9 +926,20 @@ begin
     choose a ha using hf1 (A₂ x),
     choose b hb using hf2 x,
     use (max a b),
-    intros m hm,
-    simp [hb m (lt_of_le_of_lt (le_max_right a b) hm)],
-    apply ha m (lt_of_le_of_lt (le_max_left a b) hm)
+    intros m hm ys hys,
+    simp,
+    use (A₂ x),
+    apply and.intro,
+    {
+      apply hb m (lt_of_le_of_lt (le_max_right a b) hm) ys,
+      intros i hi,
+      apply hys i hi
+    },
+    {
+      apply ha m (lt_of_le_of_lt (le_max_left a b) hm) ys,
+      intros i hi,
+      apply hys i hi
+    }
   }
 end
 
@@ -913,7 +953,7 @@ theorem rel_computable₂.comp {f : α₁ → α₂ → σ} {g : α → α₁} {
 
 theorem rel_computable₂.comp₂ {f : σ → σ₁ → α} {g : α₁ → α₂ → σ} {h : α₁ → α₂ → σ₁} {B : β → γ}
   (hf : rel_computable₂ f B) (hg : rel_computable₂ g B) (hh : rel_computable₂ h B) :
-  rel_computable₂ (λ a b, f (g a b) (h a b)) B := by apply rel_computable₂.comp hf hg hh
+  rel_computable₂ (λ a b, f (g a b) (h a b)) B := hf.comp hg hh
 
 theorem rel_computable.option_some_iff {f : α → σ} {B : β → γ} :
   rel_computable (λ a, some (f a)) B ↔ rel_computable f B :=
@@ -927,8 +967,11 @@ begin
       intro a,
       choose M hM using and.elim_right H a,
       use M,
-      intros m hm,
-      simp [hM m hm]
+      intros m hm ys hys,
+      simp,
+      apply hM m hm ys,
+      intros i hi,
+      apply hys i hi
     }
   },
   {
@@ -939,8 +982,11 @@ begin
       intro a,
       choose M hM using and.elim_right H a,
       use M,
-      intros m hm,
-      simp [hM m hm]
+      intros m hm ys hys,
+      simp,
+      apply hM m hm ys,
+      intros i hi,
+      apply hys i hi
     }
   }
 end
@@ -1004,7 +1050,7 @@ begin
     choose nh hnh using HH.2,
     let M := nat.elim (max nf ng) (λ y, max (nh (a, y, y.elim (g a) (λ y IH, h a (y, IH))))),
     use M (f a),
-    intros m hm,
+    intros m hm ys hys,
     have hmnf : m > nf :=
     begin
       apply lt_of_le_of_lt _ hm,
@@ -1027,7 +1073,19 @@ begin
         apply le_max_right
       }
     end,
-    simp [hnf m hmnf, hng m hmng],
+    have hfa : F ys a = some (f a) :=
+    begin
+      apply hnf m hmnf ys,
+      intros i hi,
+      apply hys i hi
+    end,
+    have hga : G ys a = some (g a) :=
+    begin
+      apply hng m hmng ys,
+      intros i hi,
+      apply hys i hi
+    end,
+    simp [hfa, hga],
     have heq : nat.elim (option.some (g a)) (λ (y : ℕ) (IH : option σ), h a (y, IH)) (f a) =
                     some (nat.elim (g a) (λ (y : ℕ) (IH : σ), h a (y, ↑IH)) (f a)) :=
     begin
@@ -1051,9 +1109,15 @@ begin
       simp [ih hmM],
       apply hnh,
       apply lt_of_le_of_lt _ hm,
-      simp [M],
-      apply or.intro_left,
-      refl
+      {
+        simp [M],
+        apply or.intro_left,
+        refl
+      },
+      {
+        intros i hi,
+        apply hys i hi
+      }
     }
   }
 end
@@ -1066,7 +1130,6 @@ begin
   choose F HF using hf,
   choose G HG using hg,
   choose H HH using hh,
-  simp [rel_computable],
   use (λ (l : list (option γ)) (a : α), nat.elim (G l a)
     (λ (n : ℕ) (o : option σ), option.bind o (λ (s : σ), H l (a, n, s)))
     (option.get_or_else (F l a) 0)),
@@ -1108,7 +1171,7 @@ begin
     choose nh hnh using HH.2,
     let M := nat.elim (max nf ng) (λ y, max (nh (a, y, y.elim (g a) (λ y IH, h a y IH)))),
     use M (f a),
-    intros m hm,
+    intros m hm ys hys,
     have hmnf : m > nf :=
     begin
       apply lt_of_le_of_lt _ hm,
@@ -1131,7 +1194,19 @@ begin
         apply le_max_right
       }
     end,
-    simp [hnf m hmnf, hng m hmng],
+    have hfa : F ys a = some (f a) :=
+    begin
+      apply hnf m hmnf ys,
+      intros i hi,
+      apply hys i hi
+    end,
+    have hga : G ys a = some (g a) :=
+    begin
+      apply hng m hmng ys,
+      intros i hi,
+      apply hys i hi
+    end,
+    simp [hfa, hga],
     revert hm,
     induction (f a); intro hm,
     { refl },
@@ -1144,9 +1219,15 @@ begin
       simp [ih hmM],
       apply hnh,
       apply lt_of_le_of_lt _ hm,
-      simp [M],
-      apply or.intro_left,
-      refl
+      {
+        simp [M],
+        apply or.intro_left,
+        refl
+      },
+      {
+        intros i hi,
+        apply hys i hi
+      }
     }
   }
 end
@@ -1178,12 +1259,26 @@ begin
     let M := option.get_or_else ((λ (o : option σ),
       option.bind o (λ (s : σ), some (ng (a, s)))) (f a)) 0,
     use max nf M,
-    intros m hm,
-    simp [hnf m (lt_of_le_of_lt (le_max_left nf M) hm)],
+    intros m hm ys hys,
+    have hfa : F ys a = some (f a) :=
+    begin
+      apply hnf m (lt_of_le_of_lt (le_max_left nf M) hm) ys,
+      intros i hi,
+      apply hys i hi
+    end,
+    simp [hfa],
     revert M,
     cases (f a); intros M hm,
     { refl },
-    { simp [hng (a, val) m (lt_of_le_of_lt (le_max_right _ M) hm)] }
+    {
+      have hga : G ys (a, val) = some (g a val) :=
+      begin
+        apply hng (a, val) m (lt_of_le_of_lt (le_max_right _ M) hm),
+        intros i hi,
+        apply hys i hi
+      end,
+      simp [hga]
+    }
   }
 end
 
@@ -1238,8 +1333,14 @@ begin
     intro x,
     choose M hM using and.elim_right HG x,
     use M,
-    intros m hm,
-    simp [hM m hm],
+    intros m hm ys hys,
+    have hgx : G ys x = some (g x.fst (list.map (f x.fst) (list.range x.snd))) :=
+    begin
+      apply hM m hm ys,
+      intros i hi,
+      apply hys i hi
+    end,
+    simp [hgx],
     apply H
   }
 end

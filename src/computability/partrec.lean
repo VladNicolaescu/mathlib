@@ -1345,25 +1345,25 @@ begin
   }
 end
 
-@[instance] def turing_eqv : setoid (α → σ) :=
-{
-  r := λ A B, rel_computable A B ∧ rel_computable B A,
-  iseqv :=
-    begin
-      repeat { apply and.intro },
-      {
-        intro A,
-        apply and.intro rel_computable.refl rel_computable.refl
-      },
-      {
-        intros A B h,
-        apply and.intro (and.elim_right h) (and.elim_left h)
-      },
-      {
-        intros A B C hAB hBC,
-        apply and.intro,
-        { apply rel_computable.trans (and.elim_left hAB) (and.elim_left hBC) },
-        { apply rel_computable.trans (and.elim_right hBC) (and.elim_right hAB) }
-      }
-    end
-}
+def turing_equiv (A : α → σ) (B : β → γ) := rel_computable A B ∧ rel_computable B A
+
+theorem turing_equiv.refl (A : α → σ) : turing_equiv A A :=
+  and.intro rel_computable.refl rel_computable.refl
+
+theorem turing_equiv.symm {A : α → σ} {B : β → γ} : turing_equiv A B → turing_equiv B A := and.swap
+
+theorem turing_equiv.trans {A : α → σ} {B : α₁ → σ₁} {C : β → γ} :
+  turing_equiv A B → turing_equiv B C → turing_equiv A C :=
+begin
+  intros hAB hBC,
+  apply and.intro,
+  { apply rel_computable.trans (and.elim_left hAB) (and.elim_left hBC) },
+  { apply rel_computable.trans (and.elim_right hBC) (and.elim_right hAB) }
+end
+
+theorem equivalence_of_turing_equiv : equivalence (@turing_equiv α α σ σ _ _ _ _) :=
+  ⟨turing_equiv.refl, λ x y, turing_equiv.symm, λ x y z, turing_equiv.trans⟩
+
+def turing_degree : Type := quotient (⟨turing_equiv, equivalence_of_turing_equiv⟩ : setoid (ℕ → ℕ))
+
+-- def turing_degree : Type := quotient (⟨turing_equiv, equivalence_of_turing_equiv⟩ : setoid (α → σ))

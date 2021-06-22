@@ -742,8 +742,8 @@ def oracle_list : (α → σ) → ℕ → list (option σ)
 | f (n + 1) := (oracle_list f n) ++ [option.map f (decode α (n + 1))]
 
 def rel_computable (A : α → σ) (B : β → γ) :=
-  ∃ f : list (option γ) → α → option σ, computable₂ f ∧ ∀ x, ∃ M, ∀ m > M,
-    ∀ ys : list (option γ), (∀ i < m, ys.nth i = (oracle_list B m).nth i) → f ys x = some (A x)
+  ∃ f : list (option γ) → α → option σ, computable₂ f ∧ ∀ x, ∃ M, ∀ m > M, ∀ ys : list (option γ),
+    (∀ i < m, ys.nth i = (decode β i).map (λ x, some (B x))) → f ys x = some (A x)
 
 def rel_computable₂ (A : α₁ → α₂ → σ) (B : β → γ) := rel_computable (λ p : α₁ × α₂, A p.1 p.2) B
 
@@ -802,15 +802,11 @@ begin
     intro x,
     use (encode x),
     intros m hm ys hys,
-    simp [hys (encode x) hm],
-    have h : ((oracle_list A m).nth (encode x)).iget = (oracle_list A m).inth (encode x) :=
-    begin
-      simp [list.inth]
-    end,
-    apply eq.trans h,
-    simp [oracle_list_nth (encode x) m (nat.le_of_lt hm)]
+    simp [hys (encode x) hm]
   }
 end
+
+#check option.map
 
 lemma rel_computable.trans {A : α → σ} {B : α₁ → σ₁} {C : β → γ}
   (hAB : rel_computable A B) (hBC : rel_computable B C) : rel_computable A C :=
@@ -828,11 +824,12 @@ begin
     choose Mf hF using (and.elim_right hf a),
     choose Mg hG using hg.2,
     -- TODO: choose appropriate witness
-    use Mf,
+    have M := nat.elim 0 (λ x, max (option.get_or_else (option.map Mg (decode α₁ x)) 0)) Mf,
+    use max Mf M,
     intros m hm ys hys,
-    apply hF m hm,
+    apply hF m (lt_of_le_of_lt (le_max_left Mf M) hm),
     intros i hi,
-    have h : list.map (λ (o : option (option σ₁)), o.bind id)
+    /-have h : list.map (λ (o : option (option σ₁)), o.bind id)
       (oracle_list (g ys) i) = oracle_list B i :=
     begin
       induction i with iN ih,
@@ -850,8 +847,27 @@ begin
         simp [ih (lt_trans (lt_add_one iN) hi)],
         sorry
       }
-    end,
-    sorry
+    end,-/
+    cases (decode α₁ i),
+    {
+      simp,
+      simp [oracle_list_length],
+      sorry
+    },
+    {
+      have hmMg : m > Mg val :=
+      begin
+        sorry
+      end,
+      have hgval : g ys val = some (B val) :=
+      begin
+        apply hG val m hmMg,
+        intros i hi,
+        apply hys i hi
+      end,
+      simp [hgval],
+      sorry
+    }
   }
 end
 

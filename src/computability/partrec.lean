@@ -743,7 +743,7 @@ def oracle_list : (α → σ) → ℕ → list (option σ)
 
 def rel_computable (A : α → σ) (B : β → γ) :=
   ∃ f : list (option γ) → α → option σ, computable₂ f ∧ ∀ x, ∃ M, ∀ m > M, ∀ ys : list (option γ),
-    (∀ i < m, ys.nth i = (decode β i).map (λ x, some (B x))) → f ys x = some (A x)
+    (∀ i < m, ys.nth i = some ((decode β i).map B)) → f ys x = some (A x)
 
 def rel_computable₂ (A : α₁ → α₂ → σ) (B : β → γ) := rel_computable (λ p : α₁ × α₂, A p.1 p.2) B
 
@@ -755,7 +755,7 @@ begin
 end
 
 lemma oracle_last_value {A : α → σ} {n : ℕ} :
-  (oracle_list A n).inth n = option.map A (decode α n) :=
+  (oracle_list A n).nth n = some ((decode α n).map A) :=
 begin
   cases n,
   { finish },
@@ -766,8 +766,20 @@ begin
   }
 end
 
+/-lemma oracle_last_value_inth {A : α → σ} {n : ℕ} :
+  (oracle_list A n).inth n = option.map A (decode α n) :=
+begin
+  cases n,
+  { finish },
+  {
+    simp [oracle_list, nat.succ_eq_add_one],
+    simp [list.nth_append_right (eq.le oracle_list_length),
+          oracle_list_length]
+  }
+end-/
+
 lemma oracle_list_nth {A : α → σ} (n : ℕ) :
-  ∀ m ≥ n, (oracle_list A m).inth n = option.map A (decode α n) :=
+  ∀ m ≥ n, (oracle_list A m).nth n =  some ((decode α n).map A) :=
 begin
   intros m h,
   induction m with m ih,
@@ -790,6 +802,30 @@ begin
   }
 end
 
+/-lemma oracle_list_inth {A : α → σ} (n : ℕ) :
+  ∀ m ≥ n, (oracle_list A m).inth n = option.map A (decode α n) :=
+begin
+  intros m h,
+  induction m with m ih,
+  {
+    cases h,
+    finish
+  },
+  {
+    cases h with _ hnm,
+    { apply oracle_last_value_inth },
+    {
+      have hnlen : n < (oracle_list A m).length :=
+      begin
+        simp [oracle_list_length],
+        apply nat.lt_succ_iff.mpr hnm
+      end,
+      simp [oracle_list, list.nth_append hnlen],
+      apply ih hnm
+    }
+  }
+end-/
+
 lemma rel_computable.refl {A : α → σ} : rel_computable A A :=
 begin
   use (λ (l : list (option σ)) (a : α), l.inth (encode a)),
@@ -806,7 +842,18 @@ begin
   }
 end
 
-#check option.map
+lemma list_length_of_nth {α} {l : list α} (n : ℕ) (h : ∃ a, l.nth n = some a) : l.length - 1 ≥ n :=
+begin
+  induction n with n ihn,
+  { simp },
+  {
+    induction l with a l ihl,
+    { finish },
+    {
+      sorry
+    }
+  }
+end
 
 lemma rel_computable.trans {A : α → σ} {B : α₁ → σ₁} {C : β → γ}
   (hAB : rel_computable A B) (hBC : rel_computable B C) : rel_computable A C :=
@@ -823,40 +870,36 @@ begin
     intro a,
     choose Mf hF using (and.elim_right hf a),
     choose Mg hG using hg.2,
-    -- TODO: choose appropriate witness
-    have M := nat.elim 0 (λ x, max (option.get_or_else (option.map Mg (decode α₁ x)) 0)) Mf,
+    let M := nat.elim 0 (λ x, max (option.get_or_else (option.map Mg (decode α₁ x)) 0)) Mf,
     use max Mf M,
     intros m hm ys hys,
     apply hF m (lt_of_le_of_lt (le_max_left Mf M) hm),
     intros i hi,
-    /-have h : list.map (λ (o : option (option σ₁)), o.bind id)
-      (oracle_list (g ys) i) = oracle_list B i :=
+    have hlen : ys.length - 1 >= i :=
     begin
-      induction i with iN ih,
-      {
-        simp [oracle_list],
-        cases (decode α₁ 0),
-        { refl },
-        {
-          simp,
-          sorry
-        }
-      },
-      {
-        simp [oracle_list],
-        simp [ih (lt_trans (lt_add_one iN) hi)],
-        sorry
-      }
-    end,-/
-    cases (decode α₁ i),
+      apply list_length_of_nth i,
+      use (option.map C (decode β i)),
+      apply hys i hi
+    end,
+    cases h : decode α₁ i,
     {
       simp,
-      simp [oracle_list_length],
-      sorry
+      use none,
+      apply and.intro,
+      {
+        simp [oracle_list_nth i (ys.length - 1) hlen],
+        apply h
+      },
+      {
+        intros s o ho,
+        finish
+      }
     },
     {
       have hmMg : m > Mg val :=
       begin
+        apply lt_of_le_of_lt _ (lt_of_le_of_lt (le_max_right Mf M) hm),
+        simp [M],
         sorry
       end,
       have hgval : g ys val = some (B val) :=
@@ -866,7 +909,9 @@ begin
         apply hys i hi
       end,
       simp [hgval],
-      sorry
+      simp [oracle_list_nth i (ys.length - 1) hlen],
+      use val,
+      apply and.intro h hgval
     }
   }
 end

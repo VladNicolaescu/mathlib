@@ -745,6 +745,20 @@ def rel_computable (A : α → σ) (B : β → γ) :=
   ∃ f : list (option γ) → α → option σ, computable₂ f ∧ ∀ x, ∃ M, ∀ m > M, ∀ ys : list (option γ),
     (∀ i < m, ys.nth i = some ((decode β i).map B)) → f ys x = some (A x)
 
+theorem computable.oracle_list {f : α → σ} (h : computable f) : computable (oracle_list f) :=
+begin
+  sorry
+end
+
+theorem computable₂.oracle_list {f : α → α₁ → σ} {g : α → ℕ}
+  (hf : computable₂ f) (hg : computable g) : computable (λ a, oracle_list (f a) (g a)) :=
+begin
+  sorry
+end
+
+lemma computable₂.ignore_arg {f : α → σ} (h : computable f) :
+  computable₂ (λ (a : α) (b : β), f a) := computable.comp₂ h (primrec₂.to_comp primrec₂.left)
+
 def rel_computable₂ (A : α₁ → α₂ → σ) (B : β → γ) := rel_computable (λ p : α₁ × α₂, A p.1 p.2) B
 
 lemma oracle_list_length {A : α → σ} {n : ℕ} : (oracle_list A n).length = n + 1 :=
@@ -842,15 +856,36 @@ begin
   }
 end
 
-lemma list_length_of_nth {α} {l : list α} (n : ℕ) (h : ∃ a, l.nth n = some a) : l.length - 1 ≥ n :=
+lemma list_length_of_nth {α} {l : list α} (n : ℕ) (h : ∃ a, l.nth n = some a) : l.length > n :=
 begin
-  induction n with n ihn,
-  { simp },
+  induction l with a l ih generalizing n,
+  { finish },
   {
-    induction l with a l ihl,
-    { finish },
+    cases n,
+    { simp },
     {
-      sorry
+      simp [list.nth] at h,
+      simp [list.length],
+      apply nat.lt_succ_iff.mpr (ih n h)
+    }
+  }
+end
+
+lemma elim_max_le {m n : ℕ} (f : ℕ → ℕ) (h : m < n) : f m ≤ nat.elim 0 (λ x, max (f x)) n :=
+begin
+  induction n with n ih,
+  { cases h },
+  {
+    cases h with _ hmsucc,
+    {
+      simp,
+      apply or.intro_left,
+      refl
+    },
+    {
+      simp,
+      apply or.intro_right,
+      apply ih hmsucc
     }
   }
 end
@@ -864,22 +899,48 @@ begin
     f (list.map (λ (o : option (option σ₁)), o.bind id) (oracle_list (g l) (l.length - 1))) a),
   apply and.intro,
   {
-    sorry
+    apply computable₂.comp₂ (and.elim_left hf) _ (primrec₂.to_comp primrec₂.right),
+    apply computable.comp₂,
+    {
+      apply primrec.to_comp,
+      apply primrec.list_map primrec.id,
+      apply primrec.option_bind primrec.snd primrec₂.right
+    },
+    {
+      apply computable₂.ignore_arg,
+      apply computable₂.oracle_list (and.elim_left hg),
+      {
+        apply primrec.to_comp,
+        apply primrec₂.comp primrec.nat_sub primrec.list_length (primrec.const 1)
+      }
+    }
   },
   {
     intro a,
     choose Mf hF using (and.elim_right hf a),
     choose Mg hG using hg.2,
-    let M := nat.elim 0 (λ x, max (option.get_or_else (option.map Mg (decode α₁ x)) 0)) Mf,
+    let M := nat.elim 0 (λ x, max (option.get_or_else (option.map Mg (decode α₁ x)) 0)) (Mf + 1),
     use max Mf M,
     intros m hm ys hys,
-    apply hF m (lt_of_le_of_lt (le_max_left Mf M) hm),
+    apply hF (Mf + 1) (nat.lt_succ_self Mf),
     intros i hi,
-    have hlen : ys.length - 1 >= i :=
+    have him : i < m :=
+      lt_of_le_of_lt (nat.le_of_lt_succ hi) (lt_of_le_of_lt (le_max_left Mf M) hm),
+    have hlen_lt : ys.length > i :=
     begin
       apply list_length_of_nth i,
       use (option.map C (decode β i)),
-      apply hys i hi
+      apply hys i him
+    end,
+    have hlen_le : ys.length - 1 >= i :=
+    begin
+      cases ys with y ys,
+      { finish },
+      {
+        simp [list.length],
+        simp [list.length] at hlen_lt,
+        apply nat.le_of_lt_succ hlen_lt
+      }
     end,
     cases h : decode α₁ i,
     {
@@ -887,7 +948,7 @@ begin
       use none,
       apply and.intro,
       {
-        simp [oracle_list_nth i (ys.length - 1) hlen],
+        simp [oracle_list_nth i (ys.length - 1) hlen_le],
         apply h
       },
       {
@@ -899,8 +960,12 @@ begin
       have hmMg : m > Mg val :=
       begin
         apply lt_of_le_of_lt _ (lt_of_le_of_lt (le_max_right Mf M) hm),
-        simp [M],
-        sorry
+        have hMgval : Mg val = (option.map Mg (decode α₁ i)).get_or_else 0 :=
+        begin
+          simp [h]
+        end,
+        simp [hMgval],
+        apply elim_max_le (λ x, option.get_or_else (option.map Mg (decode α₁ x)) 0) hi
       end,
       have hgval : g ys val = some (B val) :=
       begin
@@ -909,7 +974,7 @@ begin
         apply hys i hi
       end,
       simp [hgval],
-      simp [oracle_list_nth i (ys.length - 1) hlen],
+      simp [oracle_list_nth i (ys.length - 1) hlen_le],
       use val,
       apply and.intro h hgval
     }

@@ -767,10 +767,23 @@ begin
   { apply primrec.to_comp primrec.list_range }
 end
 
+theorem computable.oracle_list_comp {f : α → σ} {g : α → ℕ}
+  (hf : computable f) (hg : computable g) : computable (λ a, oracle_list f (g a)) :=
+begin
+  simp [oracle_list],
+  apply computable.comp,
+  {
+    apply computable.list_map,
+    apply computable.option_map (primrec.to_comp primrec.decode),
+    apply computable₂.ignore_first_arg hf
+  },
+  { apply computable.comp (primrec.to_comp primrec.list_range) hg }
+end
+
+
 theorem computable₂.oracle_list {f : α → α₁ → σ} {g : α → ℕ}
   (hf : computable₂ f) (hg : computable g) : computable (λ a, oracle_list (f a) (g a)) :=
 begin
-  simp [oracle_list],
   sorry
 end
 
@@ -837,6 +850,8 @@ begin
   }
 end
 
+#check @computable.oracle_list_comp
+
 lemma rel_computable.trans {A : α → σ} {B : α₁ → σ₁} {C : β → γ}
   (hAB : rel_computable A B) (hBC : rel_computable B C) : rel_computable A C :=
 begin
@@ -855,7 +870,8 @@ begin
     },
     {
       apply computable₂.ignore_second_arg,
-      apply computable₂.oracle_list (and.elim_left hg) (primrec.to_comp primrec.list_length)
+      --apply computable.oracle_list_comp,
+      --apply computable₂.oracle_list (and.elim_left hg) (primrec.to_comp primrec.list_length)
     }
   },
   {

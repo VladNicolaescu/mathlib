@@ -749,7 +749,12 @@ begin
   sorry
 end
 
--- theorem computable.oracle_list {f : α → σ} (h : computable f) : computable (oracle_list f)
+theorem computable₂.ignore_first_arg {f : α → σ} (h : computable f) :
+  computable₂ (λ (b : β) (a : α), f a) := computable.comp₂ h (primrec₂.to_comp primrec₂.right)
+
+lemma computable₂.ignore_second_arg {f : α → σ} (h : computable f) :
+  computable₂ (λ (a : α) (b : β), f a) := computable.comp₂ h (primrec₂.to_comp primrec₂.left)
+
 theorem computable.oracle_list {f : α → σ} (h : computable f) : computable (λ n, oracle_list f n) :=
 begin
   simp [oracle_list],
@@ -757,7 +762,7 @@ begin
   {
     apply computable.list_map,
     apply computable.option_map (primrec.to_comp primrec.decode),
-    sorry
+    apply computable₂.ignore_first_arg h
   },
   { apply primrec.to_comp primrec.list_range }
 end
@@ -768,9 +773,6 @@ begin
   simp [oracle_list],
   sorry
 end
-
-lemma computable₂.ignore_arg {f : α → σ} (h : computable f) :
-  computable₂ (λ (a : α) (b : β), f a) := computable.comp₂ h (primrec₂.to_comp primrec₂.left)
 
 def rel_computable₂ (A : α₁ → α₂ → σ) (B : β → γ) := rel_computable (λ p : α₁ × α₂, A p.1 p.2) B
 
@@ -852,7 +854,7 @@ begin
       apply primrec.option_bind primrec.snd primrec₂.right
     },
     {
-      apply computable₂.ignore_arg,
+      apply computable₂.ignore_second_arg,
       apply computable₂.oracle_list (and.elim_left hg) (primrec.to_comp primrec.list_length)
     }
   },

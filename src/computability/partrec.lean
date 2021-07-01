@@ -755,9 +755,8 @@ theorem computable₂.ignore_first_arg {f : α → σ} (h : computable f) :
 lemma computable₂.ignore_second_arg {f : α → σ} (h : computable f) :
   computable₂ (λ (a : α) (b : β), f a) := computable.comp₂ h (primrec₂.to_comp primrec₂.left)
 
-theorem computable.oracle_list {f : α → σ} (h : computable f) : computable (λ n, oracle_list f n) :=
+theorem computable.oracle_list {f : α → σ} (h : computable f) : computable (oracle_list f) :=
 begin
-  simp [oracle_list],
   apply computable.comp,
   {
     apply computable.list_map,
@@ -870,8 +869,7 @@ begin
     },
     {
       apply computable₂.ignore_second_arg,
-      --apply computable.oracle_list_comp,
-      --apply computable₂.oracle_list (and.elim_left hg) (primrec.to_comp primrec.list_length)
+      apply computable₂.oracle_list (and.elim_left hg) (primrec.to_comp primrec.list_length)
     }
   },
   {

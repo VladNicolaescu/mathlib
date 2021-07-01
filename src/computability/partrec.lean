@@ -737,22 +737,35 @@ variables {α : Type*} {β : Type*} {γ : Type*} {σ : Type*} {α₁ : Type*} {�
 variables [primcodable α] [primcodable β] [primcodable γ] [primcodable σ]
 variables [primcodable α₁] [primcodable α₂] [primcodable σ₁]
 
-def oracle_list : (α → σ) → ℕ → list (option σ)
-| f 0 := [option.map f (decode α 0)]
-| f (n + 1) := (oracle_list f n) ++ [option.map f (decode α (n + 1))]
+def oracle_list (f : α → σ) (n : ℕ) :=
+  list.map (λ n, option.map f (decode α n)) (list.range n)
 
 def rel_computable (A : α → σ) (B : β → γ) :=
   ∃ f : list (option γ) → α → option σ, computable₂ f ∧ ∀ x, ∃ M, ∀ m > M, ∀ ys : list (option γ),
     (∀ i < m, ys.nth i = some ((decode β i).map B)) → f ys x = some (A x)
 
-theorem computable.oracle_list {f : α → σ} (h : computable f) : computable (oracle_list f) :=
+theorem computable.list_map {f : α → σ} (h : computable f) : computable (list.map f) :=
 begin
   sorry
+end
+
+-- theorem computable.oracle_list {f : α → σ} (h : computable f) : computable (oracle_list f)
+theorem computable.oracle_list {f : α → σ} (h : computable f) : computable (λ n, oracle_list f n) :=
+begin
+  simp [oracle_list],
+  apply computable.comp,
+  {
+    apply computable.list_map,
+    apply computable.option_map (primrec.to_comp primrec.decode),
+    sorry
+  },
+  { apply primrec.to_comp primrec.list_range }
 end
 
 theorem computable₂.oracle_list {f : α → α₁ → σ} {g : α → ℕ}
   (hf : computable₂ f) (hg : computable g) : computable (λ a, oracle_list (f a) (g a)) :=
 begin
+  simp [oracle_list],
   sorry
 end
 
@@ -761,84 +774,16 @@ lemma computable₂.ignore_arg {f : α → σ} (h : computable f) :
 
 def rel_computable₂ (A : α₁ → α₂ → σ) (B : β → γ) := rel_computable (λ p : α₁ × α₂, A p.1 p.2) B
 
-lemma oracle_list_length {A : α → σ} {n : ℕ} : (oracle_list A n).length = n + 1 :=
-begin
-  induction n with n ih,
-  { simp [oracle_list] },
-  { simp [oracle_list, ih] }
-end
-
-lemma oracle_last_value {A : α → σ} {n : ℕ} :
-  (oracle_list A n).nth n = some ((decode α n).map A) :=
-begin
-  cases n,
-  { finish },
-  {
-    simp [oracle_list, nat.succ_eq_add_one],
-    simp [list.nth_append_right (eq.le oracle_list_length),
-          oracle_list_length]
-  }
-end
-
-/-lemma oracle_last_value_inth {A : α → σ} {n : ℕ} :
-  (oracle_list A n).inth n = option.map A (decode α n) :=
-begin
-  cases n,
-  { finish },
-  {
-    simp [oracle_list, nat.succ_eq_add_one],
-    simp [list.nth_append_right (eq.le oracle_list_length),
-          oracle_list_length]
-  }
-end-/
-
 lemma oracle_list_nth {A : α → σ} (n : ℕ) :
-  ∀ m ≥ n, (oracle_list A m).nth n =  some ((decode α n).map A) :=
+  ∀ m > n, (oracle_list A m).nth n =  some ((decode α n).map A) :=
 begin
   intros m h,
-  induction m with m ih,
-  {
-    cases h,
-    finish
-  },
-  {
-    cases h with _ hnm,
-    { apply oracle_last_value },
-    {
-      have hnlen : n < (oracle_list A m).length :=
-      begin
-        simp [oracle_list_length],
-        apply nat.lt_succ_iff.mpr hnm
-      end,
-      simp [oracle_list, list.nth_append hnlen],
-      apply ih hnm
-    }
-  }
+  simp [oracle_list],
+  use n,
+  apply and.intro,
+  { apply list.nth_range h },
+  { refl }
 end
-
-/-lemma oracle_list_inth {A : α → σ} (n : ℕ) :
-  ∀ m ≥ n, (oracle_list A m).inth n = option.map A (decode α n) :=
-begin
-  intros m h,
-  induction m with m ih,
-  {
-    cases h,
-    finish
-  },
-  {
-    cases h with _ hnm,
-    { apply oracle_last_value_inth },
-    {
-      have hnlen : n < (oracle_list A m).length :=
-      begin
-        simp [oracle_list_length],
-        apply nat.lt_succ_iff.mpr hnm
-      end,
-      simp [oracle_list, list.nth_append hnlen],
-      apply ih hnm
-    }
-  }
-end-/
 
 lemma rel_computable.refl {A : α → σ} : rel_computable A A :=
 begin
@@ -896,7 +841,7 @@ begin
   choose f hf using hAB,
   choose g hg using hBC,
   use (λ (l : list (option γ)) (a : α),
-    f (list.map (λ (o : option (option σ₁)), o.bind id) (oracle_list (g l) (l.length - 1))) a),
+    f (list.map (λ (o : option (option σ₁)), o.bind id) (oracle_list (g l) l.length)) a),
   apply and.intro,
   {
     apply computable₂.comp₂ (and.elim_left hf) _ (primrec₂.to_comp primrec₂.right),
@@ -908,11 +853,7 @@ begin
     },
     {
       apply computable₂.ignore_arg,
-      apply computable₂.oracle_list (and.elim_left hg),
-      {
-        apply primrec.to_comp,
-        apply primrec₂.comp primrec.nat_sub primrec.list_length (primrec.const 1)
-      }
+      apply computable₂.oracle_list (and.elim_left hg) (primrec.to_comp primrec.list_length)
     }
   },
   {
@@ -926,21 +867,11 @@ begin
     intros i hi,
     have him : i < m :=
       lt_of_le_of_lt (nat.le_of_lt_succ hi) (lt_of_le_of_lt (le_max_left Mf M) hm),
-    have hlen_lt : ys.length > i :=
+    have hlen : ys.length > i :=
     begin
       apply list_length_of_nth i,
       use (option.map C (decode β i)),
       apply hys i him
-    end,
-    have hlen_le : ys.length - 1 >= i :=
-    begin
-      cases ys with y ys,
-      { finish },
-      {
-        simp [list.length],
-        simp [list.length] at hlen_lt,
-        apply nat.le_of_lt_succ hlen_lt
-      }
     end,
     cases h : decode α₁ i,
     {
@@ -948,7 +879,7 @@ begin
       use none,
       apply and.intro,
       {
-        simp [oracle_list_nth i (ys.length - 1) hlen_le],
+        simp [oracle_list_nth i (ys.length) hlen],
         apply h
       },
       {
@@ -974,7 +905,7 @@ begin
         apply hys i hi
       end,
       simp [hgval],
-      simp [oracle_list_nth i (ys.length - 1) hlen_le],
+      simp [oracle_list_nth i ys.length hlen],
       use val,
       apply and.intro h hgval
     }
@@ -1491,5 +1422,3 @@ theorem equivalence_of_turing_equiv : equivalence (@turing_equiv α α σ σ _ _
   ⟨turing_equiv.refl, λ x y, turing_equiv.symm, λ x y z, turing_equiv.trans⟩
 
 def turing_degree : Type := quotient (⟨turing_equiv, equivalence_of_turing_equiv⟩ : setoid (ℕ → ℕ))
-
--- def turing_degree : Type := quotient (⟨turing_equiv, equivalence_of_turing_equiv⟩ : setoid (α → σ))

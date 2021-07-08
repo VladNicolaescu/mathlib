@@ -744,10 +744,79 @@ def rel_computable (A : α → σ) (B : β → γ) :=
   ∃ f : list (option γ) → α → option σ, computable₂ f ∧ ∀ x, ∃ M, ∀ m > M, ∀ ys : list (option γ),
     (∀ i < m, ys.nth i = some ((decode β i).map B)) → f ys x = some (A x)
 
-theorem computable.list_map {f : α → σ} (h : computable f) : computable (list.map f) :=
-begin
-  sorry
+/-
+lemma list_foldl'
+  {f : α → list β} {g : α → σ} {h : α → σ × β → σ}
+  (hf : by haveI := prim H; exact primrec f) (hg : primrec g)
+  (hh : by haveI := prim H; exact primrec₂ h) :
+  primrec (λ a, (f a).foldl (λ s b, h a (s, b)) (g a)) :=
+by letI := prim H; exact
+let G (a : α) (IH : σ × list β) : σ × list β :=
+  list.cases_on IH.2 IH (λ b l, (h a (IH.1, b), l)) in
+let F (a : α) (n : ℕ) := (G a)^[n] (g a, f a) in
+have primrec (λ a, (F a (encode (f a))).1), from
+fst.comp $ nat_iterate (encode_iff.2 hf) (pair hg hf) $
+  list_cases' H (snd.comp snd) snd $ to₂ $ pair
+    (hh.comp (fst.comp fst) $
+      pair ((fst.comp snd).comp fst) (fst.comp snd))
+    (snd.comp snd),
+this.of_eq $ λ a, begin
+  have : ∀ n, F a n =
+    ((list.take n (f a)).foldl (λ s b, h a (s, b)) (g a),
+      list.drop n (f a)),
+  { intro, simp [F],
+    generalize : f a = l, generalize : g a = x,
+    induction n with n IH generalizing l x, {refl},
+    simp, cases l with b l; simp [IH] },
+  rw [this, list.take_all_of_le (length_le_encode _)]
 end
+-/
+
+/-
+theorem list_foldl
+  {f : α → list β} {g : α → σ} {h : α → σ × β → σ} :
+  primrec f → primrec g → primrec₂ h →
+  primrec (λ a, (f a).foldl (λ s b, h a (s, b)) (g a)) :=
+list_foldl' (primcodable.prim _)
+-/
+
+-- F = (λ s b, h a (s, b))
+-- G = λ n s, F s (option.get_or_else ((f a).nth n) ?)
+
+theorem computable.list_foldl [inhabited β] {f : α → list β} {g : α → σ} {h : α → σ × β → σ} :
+  computable f → computable g → computable₂ h →
+  computable (λ a, (f a).foldl (λ s b, h a (s, b)) (g a)) :=
+begin
+  -- have H : computable ((λ a, nat.elim (g a) (λ n s, h a (s, (option.get_or_else ((f a).nth n) _))) (f a).length))
+  have H : computable (λ a, nat.elim (g a) (λ n s, h a (s, ((f a).inth n))) (f a).length) :=
+  begin
+    sorry
+  end,
+  intros hf hg hh,
+  apply computable.of_eq H,
+  intro a,
+  simp,
+  cases (f a) with b l,
+  { simp },
+  {
+    sorry
+  }
+end
+
+theorem computable.list_foldr {f : α → list β} {g : α → σ} {h : α → β × σ → σ}
+  (hf : computable f) (hg : computable g) (hh : computable₂ h) :
+  computable (λ a, (f a).foldr (λ b s, h a (b, s)) (g a)) :=
+(computable.list_foldl (computable.list_reverse.comp hf) hg $ computable.to₂ $
+  computable₂.comp hh computable.fst $ (computable.pair computable.snd computable.fst).comp
+    computable.snd).of_eq $
+λ a, by simp [list.foldl_reverse]
+
+theorem computable.list_map {f : α → list β} {g : α → β → σ}
+  (hf : computable f) (hg : computable₂ g) : computable (λ a, (f a).map (g a)) :=
+(computable.list_foldr hf (computable.const []) $ computable.to₂ $ computable₂.comp
+    computable.list_cons (hg.comp computable.fst (computable.comp computable.fst computable.snd))
+      (computable.comp computable.snd computable.snd)).of_eq $
+λ a, by induction f a; simp *
 
 theorem computable₂.ignore_first_arg {f : α → σ} (h : computable f) :
   computable₂ (λ (b : β) (a : α), f a) := computable.comp₂ h (primrec₂.to_comp primrec₂.right)
@@ -755,35 +824,20 @@ theorem computable₂.ignore_first_arg {f : α → σ} (h : computable f) :
 lemma computable₂.ignore_second_arg {f : α → σ} (h : computable f) :
   computable₂ (λ (a : α) (b : β), f a) := computable.comp₂ h (primrec₂.to_comp primrec₂.left)
 
-theorem computable.oracle_list {f : α → σ} (h : computable f) : computable (oracle_list f) :=
-begin
-  apply computable.comp,
-  {
-    apply computable.list_map,
-    apply computable.option_map (primrec.to_comp primrec.decode),
-    apply computable₂.ignore_first_arg h
-  },
-  { apply primrec.to_comp primrec.list_range }
-end
-
-theorem computable.oracle_list_comp {f : α → σ} {g : α → ℕ}
-  (hf : computable f) (hg : computable g) : computable (λ a, oracle_list f (g a)) :=
-begin
-  simp [oracle_list],
-  apply computable.comp,
-  {
-    apply computable.list_map,
-    apply computable.option_map (primrec.to_comp primrec.decode),
-    apply computable₂.ignore_first_arg hf
-  },
-  { apply computable.comp (primrec.to_comp primrec.list_range) hg }
-end
-
-
-theorem computable₂.oracle_list {f : α → α₁ → σ} {g : α → ℕ}
+theorem computable.oracle_list {f : α → α₁ → σ} {g : α → ℕ}
   (hf : computable₂ f) (hg : computable g) : computable (λ a, oracle_list (f a) (g a)) :=
 begin
-  sorry
+  apply computable.list_map,
+  { apply computable.comp (primrec.to_comp primrec.list_range) hg },
+  {
+    apply computable.option_map,
+    { apply computable.comp computable.decode (computable.snd) },
+    {
+      apply computable₂.comp₂ hf,
+      { apply computable₂.ignore_second_arg computable.fst },
+      { apply computable₂.ignore_first_arg computable.id }
+    }
+  }
 end
 
 def rel_computable₂ (A : α₁ → α₂ → σ) (B : β → γ) := rel_computable (λ p : α₁ × α₂, A p.1 p.2) B
@@ -849,8 +903,6 @@ begin
   }
 end
 
-#check @computable.oracle_list_comp
-
 lemma rel_computable.trans {A : α → σ} {B : α₁ → σ₁} {C : β → γ}
   (hAB : rel_computable A B) (hBC : rel_computable B C) : rel_computable A C :=
 begin
@@ -869,7 +921,7 @@ begin
     },
     {
       apply computable₂.ignore_second_arg,
-      apply computable₂.oracle_list (and.elim_left hg) (primrec.to_comp primrec.list_length)
+      apply computable.oracle_list (and.elim_left hg) (primrec.to_comp primrec.list_length)
     }
   },
   {
@@ -936,7 +988,7 @@ begin
   {
     apply computable.comp₂ computable.option_some,
     apply hf.comp₂,
-    apply primrec.to_comp primrec.snd
+    apply computable.snd
   },
   {
     intro x,
@@ -992,7 +1044,7 @@ begin
     apply computable.option_bind hf2comp,
     apply hf1comp.comp₂,
     { apply computable.comp₂ computable.fst (primrec₂.to_comp primrec₂.left) },
-    { apply primrec.to_comp primrec.snd }
+    { apply computable.snd }
   },
   {
     intro x,

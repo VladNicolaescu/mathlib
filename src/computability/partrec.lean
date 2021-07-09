@@ -744,6 +744,9 @@ def rel_computable (A : α → σ) (B : β → γ) :=
   ∃ f : list (option γ) → α → option σ, computable₂ f ∧ ∀ x, ∃ M, ∀ m > M, ∀ ys : list (option γ),
     (∀ i < m, ys.nth i = some ((decode β i).map B)) → f ys x = some (A x)
 
+def option_pair (a : option α) (b : option β) : option (α × β) :=
+  a.bind $ λ a, b.map $ λ b, (a, b)
+
 /-
 lemma list_foldl'
   {f : α → list β} {g : α → σ} {h : α → σ × β → σ}
@@ -780,15 +783,14 @@ theorem list_foldl
 list_foldl' (primcodable.prim _)
 -/
 
--- F = (λ s b, h a (s, b))
--- G = λ n s, F s (option.get_or_else ((f a).nth n) ?)
-
-theorem computable.list_foldl [inhabited β] {f : α → list β} {g : α → σ} {h : α → σ × β → σ} :
+theorem computable.list_foldl {f : α → list β} {g : α → σ} {h : α → σ × β → σ} :
   computable f → computable g → computable₂ h →
   computable (λ a, (f a).foldl (λ s b, h a (s, b)) (g a)) :=
 begin
-  -- have H : computable ((λ a, nat.elim (g a) (λ n s, h a (s, (option.get_or_else ((f a).nth n) _))) (f a).length))
-  have H : computable (λ a, nat.elim (g a) (λ n s, h a (s, ((f a).inth n))) (f a).length) :=
+  -- have H : computable (λ a, nat.elim (g a) (λ n s, F s ((f a).nth n)) (f a).length)
+  have hopt := (λ (a : α) (p : option (σ × β)), option.bind p (λ x, option.some (h a x))),
+  have H : computable (λ a, nat.elim (g a) (λ n s, option.get_or_else
+              (hopt a (option_pair (some s)((f a).nth n))) (g a)) (f a).length) :=
   begin
     sorry
   end,
@@ -799,6 +801,7 @@ begin
   cases (f a) with b l,
   { simp },
   {
+    simp,
     sorry
   }
 end
@@ -997,9 +1000,6 @@ begin
     finish
   }
 end
-
-def option_pair (a : option α) (b : option β) : option (α × β) :=
-  a.bind $ λ a, b.map $ λ b, (a, b)
 
 lemma rel_computable.pair {A₁ : α → σ} {A₂ : α → σ₁} {B : β → γ} :
   rel_computable A₁ B → rel_computable A₂ B → rel_computable (λ a, (A₁ a, A₂ a)) B :=

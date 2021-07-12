@@ -747,48 +747,12 @@ def rel_computable (A : α → σ) (B : β → γ) :=
 def option_pair (a : option α) (b : option β) : option (α × β) :=
   a.bind $ λ a, b.map $ λ b, (a, b)
 
-/-
-lemma list_foldl'
-  {f : α → list β} {g : α → σ} {h : α → σ × β → σ}
-  (hf : by haveI := prim H; exact primrec f) (hg : primrec g)
-  (hh : by haveI := prim H; exact primrec₂ h) :
-  primrec (λ a, (f a).foldl (λ s b, h a (s, b)) (g a)) :=
-by letI := prim H; exact
-let G (a : α) (IH : σ × list β) : σ × list β :=
-  list.cases_on IH.2 IH (λ b l, (h a (IH.1, b), l)) in
-let F (a : α) (n : ℕ) := (G a)^[n] (g a, f a) in
-have primrec (λ a, (F a (encode (f a))).1), from
-fst.comp $ nat_iterate (encode_iff.2 hf) (pair hg hf) $
-  list_cases' H (snd.comp snd) snd $ to₂ $ pair
-    (hh.comp (fst.comp fst) $
-      pair ((fst.comp snd).comp fst) (fst.comp snd))
-    (snd.comp snd),
-this.of_eq $ λ a, begin
-  have : ∀ n, F a n =
-    ((list.take n (f a)).foldl (λ s b, h a (s, b)) (g a),
-      list.drop n (f a)),
-  { intro, simp [F],
-    generalize : f a = l, generalize : g a = x,
-    induction n with n IH generalizing l x, {refl},
-    simp, cases l with b l; simp [IH] },
-  rw [this, list.take_all_of_le (length_le_encode _)]
-end
--/
-
-/-
-theorem list_foldl
-  {f : α → list β} {g : α → σ} {h : α → σ × β → σ} :
-  primrec f → primrec g → primrec₂ h →
-  primrec (λ a, (f a).foldl (λ s b, h a (s, b)) (g a)) :=
-list_foldl' (primcodable.prim _)
--/
-
 theorem computable.list_foldl {f : α → list β} {g : α → σ} {h : α → σ × β → σ} :
   computable f → computable g → computable₂ h →
   computable (λ a, (f a).foldl (λ s b, h a (s, b)) (g a)) :=
 begin
   -- have H : computable (λ a, nat.elim (g a) (λ n s, F s ((f a).nth n)) (f a).length)
-  have hopt := (λ (a : α) (p : option (σ × β)), option.bind p (λ x, option.some (h a x))),
+  let hopt := (λ (a : α) (p : option (σ × β)), option.bind p (λ x, option.some (h a x))),
   have H : computable (λ a, nat.elim (g a) (λ n s, option.get_or_else
               (hopt a (option_pair (some s)((f a).nth n))) (g a)) (f a).length) :=
   begin
